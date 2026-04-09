@@ -28,6 +28,27 @@ const viewLimiter = rateLimit({
   message: { error: "Too many requests." },
 });
 
+// Admin bulk action limiter — 10 bulk ops per 15min window
+const bulkActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many bulk actions. Please wait 15 minutes." },
+});
+
+// Admin delete limiter — 5 delete ops per 15min window (stricter)
+const deleteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Delete rate limit reached. Please wait 15 minutes." },
+});
+
+// Max items per single bulk delete request
+const BULK_DELETE_CAP = 25;
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "";
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
@@ -505,7 +526,7 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.delete("/api/admin/reviews/:id", async (req, res) => {
+  app.delete("/api/admin/reviews/:id", deleteLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
@@ -553,7 +574,7 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.delete("/api/admin/listings/:id", async (req, res) => {
+  app.delete("/api/admin/listings/:id", deleteLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
@@ -563,13 +584,14 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.post("/api/admin/listings/bulk", async (req, res) => {
+  app.post("/api/admin/listings/bulk", bulkActionLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
       const { ids, status } = req.body;
       if (!ids?.length || !status) return res.status(400).json({ error: "ids array and status required" });
       if (status === "delete") {
+        if (ids.length > BULK_DELETE_CAP) return res.status(400).json({ error: `Cannot delete more than ${BULK_DELETE_CAP} items at once` });
         const { error } = await supabase.from("listings").delete().in("id", ids);
         if (error) return res.status(400).json({ error: error.message });
       } else {
@@ -686,13 +708,14 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.post("/api/admin/coaches/bulk", async (req, res) => {
+  app.post("/api/admin/coaches/bulk", bulkActionLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
       const { ids, status } = req.body;
       if (!ids?.length || !status) return res.status(400).json({ error: "ids array and status required" });
       if (status === "delete") {
+        if (ids.length > BULK_DELETE_CAP) return res.status(400).json({ error: `Cannot delete more than ${BULK_DELETE_CAP} items at once` });
         const { error } = await supabase.from("coaches").delete().in("id", ids);
         if (error) return res.status(400).json({ error: error.message });
       } else {
@@ -703,7 +726,7 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.delete("/api/admin/coaches/:id", async (req, res) => {
+  app.delete("/api/admin/coaches/:id", deleteLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
@@ -772,7 +795,7 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.delete("/api/admin/claims/:id", async (req, res) => {
+  app.delete("/api/admin/claims/:id", deleteLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
@@ -825,7 +848,7 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.post("/api/admin/clubs/bulk", async (req, res) => {
+  app.post("/api/admin/clubs/bulk", bulkActionLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
@@ -1021,7 +1044,7 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
-  app.delete("/api/admin/events/:id", async (req, res) => {
+  app.delete("/api/admin/events/:id", deleteLimiter, async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
