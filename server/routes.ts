@@ -1346,5 +1346,104 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Public: Sponsors (location-based) ─────────────────────
+
+  app.get("/api/sponsors", async (req, res) => {
+    try {
+      const supabase = getSupabaseClient();
+      const lat = parseFloat(req.query.lat as string);
+      const lng = parseFloat(req.query.lng as string);
+
+      // Always fetch active, non-expired sponsors
+      let query = supabase
+        .from("sponsors")
+        .select("id, name, logo_url, website, description, city, state, is_main_sponsor, lat, lng, radius_miles")
+        .eq("is_active", true)
+        .or("expires_at.is.null,expires_at.gt." + new Date().toISOString());
+
+      const { data, error } = await query;
+      if (error) return res.status(400).json({ error: error.message });
+
+      let sponsors = data || [];
+
+      // If user has location, filter by distance (keep main sponsors regardless)
+      if (!isNaN(lat) && !isNaN(lng)) {
+        sponsors = sponsors.filter(s => {
+          if (s.is_main_sponsor) return true; // main sponsors always show
+          if (!s.lat || !s.lng) return false;
+          const R = 3958.8;
+          const dLat = (s.lat - lat) * Math.PI / 180;
+          const dLon = (s.lng - lng) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(s.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+          const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return dist <= (s.radius_miles || 25);
+        });
+      }
+
+      // Sort: main sponsors first, then by name
+      sponsors.sort((a, b) => {
+        if (a.is_main_sponsor && !b.is_main_sponsor) return -1;
+        if (!a.is_main_sponsor && b.is_main_sponsor) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      return res.json(sponsors);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // ── Admin: Sponsors CRUD ──────────────────────────────────
+
+  app.get("/api/admin/sponsors", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { data, error } = await supabase
+        .from("sponsors")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.post("/api/admin/sponsors", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const allowed = ["name", "logo_url", "website", "description", "city", "state", "region", "lat", "lng", "radius_miles", "is_active", "is_main_sponsor", "expires_at", "total_spent", "contact_name", "contact_email"];
+      const fields: any = {};
+      for (const k of allowed) if (req.body[k] !== undefined) fields[k] = req.body[k];
+      const { data, error } = await supabase.from("sponsors").insert(fields).select().single();
+      if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "create", "sponsor", [data.id]);
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.patch("/api/admin/sponsors/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const allowed = ["name", "logo_url", "website", "description", "city", "state", "region", "lat", "lng", "radius_miles", "is_active", "is_main_sponsor", "expires_at", "total_spent", "contact_name", "contact_email"];
+      const fields: any = { updated_at: new Date().toISOString() };
+      for (const k of allowed) if (req.body[k] !== undefined) fields[k] = req.body[k];
+      const { data, error } = await supabase.from("sponsors").update(fields).eq("id", req.params.id).select().single();
+      if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "update", "sponsor", [req.params.id]);
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.delete("/api/admin/sponsors/:id", deleteLimiter, async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { error } = await supabase.from("sponsors").delete().eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "delete", "sponsor", [req.params.id]);
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   return httpServer;
 }

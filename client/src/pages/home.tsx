@@ -7,6 +7,17 @@ import { ClubBadge } from '@/components/ui/ClubBadge'
 import { API_BASE } from '@/lib/api'
 const API = API_BASE
 const AGE_GROUPS = ['U6', 'U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'U19+']
+
+interface Sponsor {
+  id: string
+  name: string
+  logo_url: string | null
+  website: string | null
+  description: string | null
+  city: string | null
+  state: string | null
+  is_main_sponsor: boolean
+}
 const RADIUS_OPTIONS = [5, 10, 15, 25, 50]
 
 // ── Age Group Modal ──────────────────────────────────────────
@@ -335,6 +346,7 @@ export default function Home() {
   const carouselRef = useRef<HTMLDivElement>(null)
   const [showAgeModal, setShowAgeModal] = useState(false)
   const [showRegionModal, setShowRegionModal] = useState(false)
+  const [sponsors, setSponsors] = useState<Sponsor[]>([])
 
   useEffect(() => {
     async function load() {
@@ -347,6 +359,17 @@ export default function Home() {
       setLoading(false)
     }
     load()
+    // Load sponsors (try with location)
+    navigator.geolocation?.getCurrentPosition(
+      pos => {
+        fetch(`${API}/api/sponsors?lat=${pos.coords.latitude}&lng=${pos.coords.longitude}`)
+          .then(r => r.json()).then(d => setSponsors(d || [])).catch(() => {})
+      },
+      () => {
+        fetch(`${API}/api/sponsors`).then(r => r.json()).then(d => setSponsors(d || [])).catch(() => {})
+      },
+      { timeout: 5000 }
+    )
   }, [])
 
   function handleSearch(e: React.FormEvent) {
@@ -524,6 +547,68 @@ export default function Home() {
         )}
       </section>
 
+      {/* Why FutbolGrade — Value Proposition */}
+      <section className="border-b" style={{ borderColor: 'var(--fg-border)', background: 'var(--fg-surface)' }}>
+        <div className="max-w-5xl mx-auto px-6 py-16">
+          <div className="text-center mb-10">
+            <h2 className="font-bebas text-3xl tracking-[2px]" style={{ color: 'var(--fg-green)' }}>Empowering Youth Soccer Communities</h2>
+            <div className="w-20 h-1 mx-auto mt-2 rounded-full" style={{ background: 'var(--fg-green)' }} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* For Parents */}
+            <div className="bg-white border rounded-2xl p-8" style={{ borderColor: 'var(--fg-border)' }}>
+              <h3 className="font-bebas text-xl tracking-[1px] mb-2" style={{ color: 'var(--fg-text)' }}>For Parents</h3>
+              <p className="text-sm mb-5 leading-relaxed" style={{ color: 'var(--fg-muted)' }}>Your investment in your child's growth deserves clarity and accountability.</p>
+              <div className="space-y-4">
+                {[
+                  { title: 'Share Honest Feedback', desc: 'Post anonymous reviews without fear of retaliation.' },
+                  { title: 'Spotlight Great Coaches', desc: 'Recognize the mentors who go above and beyond.' },
+                  { title: 'Drive Accountability', desc: 'Transparency encourages better communication and leadership.' },
+                  { title: 'Compare Clubs Side by Side', desc: 'Evaluate responsiveness, organization, and community trust.' },
+                ].map(item => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <span className="mt-0.5 text-base" style={{ color: 'var(--fg-green)' }}>⚽</span>
+                    <div>
+                      <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{item.title}</span>
+                      <span className="text-sm" style={{ color: 'var(--fg-muted)' }}> — {item.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <a href="/auth/register" className="inline-flex items-center gap-2 mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
+                style={{ background: 'var(--fg-green)' }} data-testid="parents-cta">
+                Sign Up To Get Started <span>→</span>
+              </a>
+            </div>
+            {/* For Clubs */}
+            <div className="bg-white border rounded-2xl p-8" style={{ borderColor: 'var(--fg-border)' }}>
+              <h3 className="font-bebas text-xl tracking-[1px] mb-2" style={{ color: 'var(--fg-text)' }}>For Clubs</h3>
+              <p className="text-sm mb-5 leading-relaxed" style={{ color: 'var(--fg-muted)' }}>Parents are paying attention. Engage with feedback to strengthen trust and loyalty.</p>
+              <div className="space-y-4">
+                {[
+                  { title: 'Access Real Feedback', desc: 'Identify and address concerns before they grow.' },
+                  { title: 'Track Your Reputation', desc: 'Monitor trends in communication, coaching, and club culture.' },
+                  { title: 'Engage Transparently', desc: 'Respond to reviews and demonstrate your commitment.' },
+                  { title: 'Earn a Trusted Club Badge', desc: 'Stand out as a club that values parent and player voices.' },
+                ].map(item => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <span className="mt-0.5 text-base" style={{ color: 'var(--fg-green)' }}>⚽</span>
+                    <div>
+                      <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{item.title}</span>
+                      <span className="text-sm" style={{ color: 'var(--fg-muted)' }}> — {item.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <a href="/clubs" className="inline-flex items-center gap-2 mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
+                style={{ background: 'var(--fg-green)' }} data-testid="clubs-cta">
+                Learn More <span>→</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Club Marquee */}
       <section className="py-10" style={{ background: '#f7f5f0' }}>
         <div className="max-w-6xl mx-auto px-6 mb-6">
@@ -534,6 +619,43 @@ export default function Home() {
         </div>
         <ClubMarquee clubs={clubs} />
       </section>
+
+      {/* Sponsors */}
+      {sponsors.length > 0 && (
+        <section className="py-12 border-t" style={{ borderColor: 'var(--fg-border)', background: 'var(--fg-surface)' }}>
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center mb-8">
+              <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Proudly Supported By</span>
+              <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: 'var(--fg-text)' }}>OUR SPONSORS</h2>
+            </div>
+            <div className="flex flex-wrap justify-center gap-6">
+              {sponsors.map(s => (
+                <a key={s.id} href={s.website || '#'} target="_blank" rel="noopener noreferrer"
+                  className="flex flex-col items-center gap-3 px-6 py-5 bg-white border rounded-2xl hover:shadow-lg transition-all"
+                  style={{ borderColor: s.is_main_sponsor ? 'var(--fg-green)' : 'var(--fg-border)', minWidth: 160 }}
+                  data-testid={`sponsor-${s.id}`}>
+                  {s.is_main_sponsor && (
+                    <span className="font-mono text-[9px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full"
+                      style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)' }}>Main Sponsor</span>
+                  )}
+                  {s.logo_url ? (
+                    <img src={s.logo_url} alt={s.name} className="h-14 w-auto object-contain" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg flex items-center justify-center font-bebas text-lg"
+                      style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)' }}>
+                      {s.name.split(' ').map(w => w[0]).join('').slice(0, 3)}
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <div className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{s.name}</div>
+                    {s.city && <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{s.city}{s.state ? `, ${s.state}` : ''}</div>}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="border-t py-8" style={{ borderColor: 'var(--fg-border)' }}>

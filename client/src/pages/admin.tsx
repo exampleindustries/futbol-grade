@@ -61,7 +61,29 @@ function AdminLoginForm() {
   )
 }
 
-type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | 'events' | 'coaches' | 'audit'
+type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | 'events' | 'coaches' | 'sponsors' | 'audit'
+
+interface AdminSponsor {
+  id: string
+  name: string
+  logo_url: string | null
+  website: string | null
+  description: string | null
+  city: string | null
+  state: string | null
+  region: string
+  lat: number | null
+  lng: number | null
+  radius_miles: number
+  is_active: boolean
+  is_main_sponsor: boolean
+  expires_at: string | null
+  total_spent: number
+  contact_name: string | null
+  contact_email: string | null
+  created_at: string
+  updated_at: string
+}
 
 interface AdminClub {
   id: string
@@ -138,6 +160,11 @@ export default function Admin() {
   const [coachEdits, setCoachEdits] = useState<Record<string, any>>({})
   const [adminEvents, setAdminEvents] = useState<(FGEvent & { club?: { id: string; name: string } | null })[]>([])
   const [eventFilter, setEventFilter] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [adminSponsors, setAdminSponsors] = useState<AdminSponsor[]>([])
+  const [editingSponsor, setEditingSponsor] = useState<string | null>(null)
+  const [sponsorEdits, setSponsorEdits] = useState<Record<string, any>>({})
+  const [showAddSponsor, setShowAddSponsor] = useState(false)
+  const [newSponsor, setNewSponsor] = useState<Record<string, any>>({ name: '', is_active: true, is_main_sponsor: false, radius_miles: 25, total_spent: 0 })
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -247,6 +274,16 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchSponsors = useCallback(async () => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`${getApiBase()}/api/admin/sponsors`, { headers: { Authorization: auth } })
+      if (res.ok) setAdminSponsors(await res.json())
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   useEffect(() => { if (profile?.is_admin) fetchStats() }, [profile, fetchStats])
   useEffect(() => { if (profile?.is_admin && tab === 'reviews') fetchReviews() }, [profile, tab, fetchReviews])
   useEffect(() => { if (profile?.is_admin && tab === 'listings') fetchListings() }, [profile, tab, fetchListings])
@@ -256,6 +293,7 @@ export default function Admin() {
   useEffect(() => { if (profile?.is_admin && tab === 'clubs') fetchClubs() }, [profile, tab, fetchClubs])
   useEffect(() => { if (profile?.is_admin && tab === 'events') fetchEvents(eventFilter) }, [profile, tab, eventFilter, fetchEvents])
   useEffect(() => { if (profile?.is_admin && tab === 'coaches') fetchAllCoaches() }, [profile, tab, fetchAllCoaches])
+  useEffect(() => { if (profile?.is_admin && tab === 'sponsors') fetchSponsors() }, [profile, tab, fetchSponsors])
   useEffect(() => { if (profile?.is_admin && tab === 'audit') fetchAuditLog(auditFilter || undefined) }, [profile, tab, auditFilter, fetchAuditLog])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
@@ -609,8 +647,8 @@ export default function Admin() {
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings', 'claims', 'imports', 'events', 'coaches', 'users', 'clubs', 'audit'] as Tab[]).map(t => {
-            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'coaches' ? allCoaches.length : t === 'users' ? users.length : t === 'clubs' ? adminClubs.length : t === 'audit' ? auditLog.length : 0) : 0
+          {(['reviews', 'listings', 'claims', 'imports', 'events', 'coaches', 'users', 'clubs', 'sponsors', 'audit'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'coaches' ? allCoaches.length : t === 'users' ? users.length : t === 'clubs' ? adminClubs.length : t === 'sponsors' ? adminSponsors.length : t === 'audit' ? auditLog.length : 0) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
                 className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
@@ -1670,6 +1708,222 @@ export default function Admin() {
                 </div>
               )
             })()}
+          </>
+        )}
+
+        {/* Sponsors tab */}
+        {tab === 'sponsors' && (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>{adminSponsors.length} sponsors</span>
+              <button onClick={() => { setShowAddSponsor(!showAddSponsor); setNewSponsor({ name: '', is_active: true, is_main_sponsor: false, radius_miles: 25, total_spent: 0 }) }}
+                className="font-mono text-xs font-semibold px-4 py-2 rounded-lg text-white"
+                style={{ background: 'var(--fg-green)' }} data-testid="add-sponsor-btn">
+                {showAddSponsor ? 'Cancel' : '+ Add Sponsor'}
+              </button>
+            </div>
+
+            {/* Add Sponsor Form */}
+            {showAddSponsor && (
+              <div className="bg-white border rounded-xl p-5 mb-4 space-y-3" style={{ borderColor: 'var(--fg-green)' }}>
+                <div className="font-semibold text-sm mb-2" style={{ color: 'var(--fg-text)' }}>New Sponsor</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <input placeholder="Name *" value={newSponsor.name || ''} onChange={e => setNewSponsor({ ...newSponsor, name: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm col-span-2 md:col-span-1" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input placeholder="Logo URL" value={newSponsor.logo_url || ''} onChange={e => setNewSponsor({ ...newSponsor, logo_url: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input placeholder="Website" value={newSponsor.website || ''} onChange={e => setNewSponsor({ ...newSponsor, website: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input placeholder="City" value={newSponsor.city || ''} onChange={e => setNewSponsor({ ...newSponsor, city: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input placeholder="State" value={newSponsor.state || ''} onChange={e => setNewSponsor({ ...newSponsor, state: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input placeholder="Contact Name" value={newSponsor.contact_name || ''} onChange={e => setNewSponsor({ ...newSponsor, contact_name: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input placeholder="Contact Email" value={newSponsor.contact_email || ''} onChange={e => setNewSponsor({ ...newSponsor, contact_email: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input placeholder="Description" value={newSponsor.description || ''} onChange={e => setNewSponsor({ ...newSponsor, description: e.target.value })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input type="number" placeholder="Latitude" value={newSponsor.lat || ''} onChange={e => setNewSponsor({ ...newSponsor, lat: e.target.value ? parseFloat(e.target.value) : null })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <input type="number" placeholder="Longitude" value={newSponsor.lng || ''} onChange={e => setNewSponsor({ ...newSponsor, lng: e.target.value ? parseFloat(e.target.value) : null })}
+                    className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  <div className="flex items-center gap-2">
+                    <label className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>Radius (mi)</label>
+                    <input type="number" value={newSponsor.radius_miles || 25} onChange={e => setNewSponsor({ ...newSponsor, radius_miles: parseInt(e.target.value) || 25 })}
+                      className="border rounded-lg px-3 py-2 text-sm w-20" style={{ borderColor: 'var(--fg-border2)' }} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>Total $ Spent</label>
+                    <input type="number" step="0.01" value={newSponsor.total_spent || 0} onChange={e => setNewSponsor({ ...newSponsor, total_spent: parseFloat(e.target.value) || 0 })}
+                      className="border rounded-lg px-3 py-2 text-sm w-28" style={{ borderColor: 'var(--fg-border2)' }} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>Exp. Date</label>
+                    <input type="date" value={newSponsor.expires_at ? newSponsor.expires_at.slice(0, 10) : ''} onChange={e => setNewSponsor({ ...newSponsor, expires_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                      className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={newSponsor.is_active} onChange={e => setNewSponsor({ ...newSponsor, is_active: e.target.checked })} />
+                    <span className="font-mono text-xs" style={{ color: 'var(--fg-text2)' }}>Active</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={newSponsor.is_main_sponsor} onChange={e => setNewSponsor({ ...newSponsor, is_main_sponsor: e.target.checked })} />
+                    <span className="font-mono text-xs" style={{ color: 'var(--fg-text2)' }}>Main Sponsor (shows everywhere)</span>
+                  </label>
+                  <button onClick={async () => {
+                    if (!newSponsor.name) return
+                    const auth = await getAuthHeader()
+                    await fetch(`${getApiBase()}/api/admin/sponsors`, {
+                      method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+                      body: JSON.stringify(newSponsor)
+                    })
+                    setShowAddSponsor(false)
+                    fetchSponsors()
+                  }} className="ml-auto font-mono text-xs font-semibold px-4 py-2 rounded-lg text-white"
+                    style={{ background: 'var(--fg-green)' }} data-testid="save-new-sponsor">Save Sponsor</button>
+                </div>
+              </div>
+            )}
+
+            {loading ? <Skeleton /> : adminSponsors.length === 0 ? (
+              <EmptyState text="No sponsors yet" />
+            ) : (
+              <div className="space-y-3">
+                {adminSponsors.map(s => {
+                  const isEditing = editingSponsor === s.id
+                  const ed = sponsorEdits
+                  const expired = s.expires_at && new Date(s.expires_at) < new Date()
+                  return (
+                    <div key={s.id} className="bg-white border rounded-xl px-5 py-4" style={{ borderColor: !s.is_active || expired ? 'var(--fg-border)' : s.is_main_sponsor ? 'var(--fg-green)' : 'var(--fg-border)' }}
+                      data-testid={`sponsor-row-${s.id}`}>
+                      <div className="flex items-start gap-4">
+                        {/* Logo */}
+                        <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 border overflow-hidden"
+                          style={{ background: 'var(--fg-surface)', borderColor: 'var(--fg-border)' }}>
+                          {s.logo_url ? <img src={s.logo_url} alt={s.name} className="w-full h-full object-contain" /> :
+                            <span className="font-bebas text-sm" style={{ color: 'var(--fg-green)' }}>{s.name.split(' ').map(w => w[0]).join('').slice(0, 3)}</span>}
+                        </div>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{s.name}</span>
+                            {s.is_main_sponsor && <span className="font-mono text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)' }}>MAIN</span>}
+                            <span className={`font-mono text-[9px] font-bold px-2 py-0.5 rounded-full ${s.is_active && !expired ? '' : ''}`}
+                              style={s.is_active && !expired ? { background: 'var(--fg-green-pale)', color: 'var(--fg-green)' } : { background: 'var(--fg-red-pale)', color: 'var(--fg-red)' }}>
+                              {!s.is_active ? 'OFF' : expired ? 'EXPIRED' : 'ACTIVE'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{s.city || 'No city'}{s.state ? `, ${s.state}` : ''}</span>
+                            <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>Radius: {s.radius_miles}mi</span>
+                            <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-green)' }}>${Number(s.total_spent).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            {s.expires_at && <span className="font-mono text-[10px]" style={{ color: expired ? 'var(--fg-red)' : 'var(--fg-muted)' }}>Exp: {new Date(s.expires_at).toLocaleDateString()}</span>}
+                            {s.contact_email && <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{s.contact_email}</span>}
+                          </div>
+                        </div>
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button onClick={async () => {
+                            const auth = await getAuthHeader()
+                            await fetch(`${getApiBase()}/api/admin/sponsors/${s.id}`, {
+                              method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ is_active: !s.is_active })
+                            })
+                            fetchSponsors()
+                          }} className="font-mono text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
+                            style={{ borderColor: 'var(--fg-border2)', color: s.is_active ? 'var(--fg-red)' : 'var(--fg-green)' }}
+                            data-testid={`toggle-sponsor-${s.id}`}>
+                            {s.is_active ? 'Turn Off' : 'Turn On'}
+                          </button>
+                          <button onClick={() => {
+                            if (isEditing) { setEditingSponsor(null); setSponsorEdits({}) }
+                            else { setEditingSponsor(s.id); setSponsorEdits({ ...s }) }
+                          }} className="font-mono text-[10px] font-semibold px-2.5 py-1 rounded-lg border"
+                            style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }}
+                            data-testid={`edit-sponsor-${s.id}`}>{isEditing ? 'Cancel' : 'Edit'}</button>
+                          <button onClick={async () => {
+                            if (!confirm('Delete this sponsor?')) return
+                            const auth = await getAuthHeader()
+                            await fetch(`${getApiBase()}/api/admin/sponsors/${s.id}`, { method: 'DELETE', headers: { Authorization: auth } })
+                            fetchSponsors()
+                          }} className="font-mono text-[10px] font-semibold px-2.5 py-1 rounded-lg border"
+                            style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-red)' }}
+                            data-testid={`delete-sponsor-${s.id}`}>Delete</button>
+                        </div>
+                      </div>
+
+                      {/* Inline Edit */}
+                      {isEditing && (
+                        <div className="mt-4 pt-4 border-t space-y-3" style={{ borderColor: 'var(--fg-border)' }}>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <input placeholder="Name" value={ed.name || ''} onChange={e => setSponsorEdits({ ...ed, name: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input placeholder="Logo URL" value={ed.logo_url || ''} onChange={e => setSponsorEdits({ ...ed, logo_url: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input placeholder="Website" value={ed.website || ''} onChange={e => setSponsorEdits({ ...ed, website: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input placeholder="City" value={ed.city || ''} onChange={e => setSponsorEdits({ ...ed, city: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input placeholder="State" value={ed.state || ''} onChange={e => setSponsorEdits({ ...ed, state: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input placeholder="Contact Name" value={ed.contact_name || ''} onChange={e => setSponsorEdits({ ...ed, contact_name: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input placeholder="Contact Email" value={ed.contact_email || ''} onChange={e => setSponsorEdits({ ...ed, contact_email: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input placeholder="Description" value={ed.description || ''} onChange={e => setSponsorEdits({ ...ed, description: e.target.value })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input type="number" placeholder="Latitude" value={ed.lat ?? ''} onChange={e => setSponsorEdits({ ...ed, lat: e.target.value ? parseFloat(e.target.value) : null })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <input type="number" placeholder="Longitude" value={ed.lng ?? ''} onChange={e => setSponsorEdits({ ...ed, lng: e.target.value ? parseFloat(e.target.value) : null })}
+                              className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            <div className="flex items-center gap-2">
+                              <label className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>Radius (mi)</label>
+                              <input type="number" value={ed.radius_miles ?? 25} onChange={e => setSponsorEdits({ ...ed, radius_miles: parseInt(e.target.value) || 25 })}
+                                className="border rounded-lg px-3 py-2 text-sm w-20" style={{ borderColor: 'var(--fg-border2)' }} />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>Total $ Spent</label>
+                              <input type="number" step="0.01" value={ed.total_spent ?? 0} onChange={e => setSponsorEdits({ ...ed, total_spent: parseFloat(e.target.value) || 0 })}
+                                className="border rounded-lg px-3 py-2 text-sm w-28" style={{ borderColor: 'var(--fg-border2)' }} />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>Exp. Date</label>
+                              <input type="date" value={ed.expires_at ? ed.expires_at.slice(0, 10) : ''} onChange={e => setSponsorEdits({ ...ed, expires_at: e.target.value ? new Date(e.target.value).toISOString() : null })}
+                                className="border rounded-lg px-3 py-2 text-sm" style={{ borderColor: 'var(--fg-border2)' }} />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={ed.is_active ?? false} onChange={e => setSponsorEdits({ ...ed, is_active: e.target.checked })} />
+                              <span className="font-mono text-xs" style={{ color: 'var(--fg-text2)' }}>Active</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={ed.is_main_sponsor ?? false} onChange={e => setSponsorEdits({ ...ed, is_main_sponsor: e.target.checked })} />
+                              <span className="font-mono text-xs" style={{ color: 'var(--fg-text2)' }}>Main Sponsor</span>
+                            </label>
+                            <button onClick={async () => {
+                              const auth = await getAuthHeader()
+                              const { id, created_at, updated_at, ...fields } = ed
+                              await fetch(`${getApiBase()}/api/admin/sponsors/${s.id}`, {
+                                method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+                                body: JSON.stringify(fields)
+                              })
+                              setEditingSponsor(null)
+                              setSponsorEdits({})
+                              fetchSponsors()
+                            }} className="ml-auto font-mono text-xs font-semibold px-4 py-2 rounded-lg text-white"
+                              style={{ background: 'var(--fg-green)' }} data-testid={`save-sponsor-${s.id}`}>Save Changes</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
 
