@@ -62,18 +62,21 @@ export default function CoachDetail() {
         <div className="bg-white border rounded-2xl p-6 md:p-8 mb-6" style={{ borderColor: 'var(--fg-border)' }}>
           <div className="flex items-start gap-4 md:gap-6">
             <div
-              className="w-16 h-16 md:w-20 md:h-20 rounded-2xl flex items-center justify-center font-bebas text-2xl md:text-3xl flex-shrink-0 border-2"
+              className="w-14 h-14 md:w-20 md:h-20 rounded-2xl flex items-center justify-center font-bebas text-xl md:text-3xl flex-shrink-0 border-2"
               style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)', borderColor: 'var(--fg-border)' }}
             >
               {initials(coach.first_name, coach.last_name)}
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="font-bebas text-3xl md:text-4xl tracking-[2px]" style={{ color: 'var(--fg-text)' }} data-testid="coach-name">
-                {coach.first_name} {coach.last_name}
-              </h1>
-              <div className="flex flex-wrap items-center gap-3 mt-1">
+              <div className="flex items-start justify-between gap-3">
+                <h1 className="font-bebas text-2xl md:text-4xl tracking-[2px] leading-tight" style={{ color: 'var(--fg-text)' }} data-testid="coach-name">
+                  {coach.first_name} {coach.last_name}
+                </h1>
+                <RatingBadge score={coach.avg_overall} size="xl" showGrade />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1">
                 {coach.club && (
-                  <a href={`/#/clubs/${(coach.club as any).id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
+                  <a href={`#/clubs/${(coach.club as any).id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
                     {(coach.club as any).name}
                   </a>
                 )}
@@ -86,7 +89,6 @@ export default function CoachDetail() {
                 )}
               </div>
             </div>
-            <RatingBadge score={coach.avg_overall} size="xl" showGrade />
           </div>
         </div>
 
@@ -104,7 +106,7 @@ export default function CoachDetail() {
         <div className="mb-6">
           {user ? (
             <a
-              href={`/#/coaches/${coach.id}/review`}
+              href={`#/coaches/${coach.id}/review`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
               style={{ background: 'var(--fg-green)', boxShadow: '0 4px 16px rgba(26,110,56,.25)' }}
               data-testid="write-review-btn"
@@ -113,7 +115,7 @@ export default function CoachDetail() {
             </a>
           ) : (
             <a
-              href="/#/auth/login"
+              href="#/auth/login"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
               style={{ background: 'var(--fg-green)', boxShadow: '0 4px 16px rgba(26,110,56,.25)' }}
               data-testid="login-to-review-btn"

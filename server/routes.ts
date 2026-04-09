@@ -1,6 +1,32 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { createClient } from "@supabase/supabase-js";
+import rateLimit from "express-rate-limit";
+
+// Rate limiters — keyed by IP
+const reviewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,                    // 5 reviews per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many reviews submitted. Please try again in 15 minutes." },
+});
+
+const listingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,                   // 10 listings per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many listings submitted. Please try again in 15 minutes." },
+});
+
+const viewLimiter = rateLimit({
+  windowMs: 60 * 1000,       // 1 minute
+  max: 30,                   // 30 view pings per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests." },
+});
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "";
@@ -20,7 +46,7 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Submit a review (requires auth)
-  app.post("/api/reviews", async (req, res) => {
+  app.post("/api/reviews", reviewLimiter, async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
@@ -90,7 +116,7 @@ export async function registerRoutes(
   });
 
   // Submit a listing (requires auth)
-  app.post("/api/listings", async (req, res) => {
+  app.post("/api/listings", listingLimiter, async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
@@ -134,7 +160,7 @@ export async function registerRoutes(
   });
 
   // Increment view count
-  app.post("/api/listings/:id/view", async (req, res) => {
+  app.post("/api/listings/:id/view", viewLimiter, async (req, res) => {
     try {
       const supabase = getSupabaseClient();
       await supabase.rpc("increment_view_count", {

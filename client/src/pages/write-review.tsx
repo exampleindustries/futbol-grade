@@ -76,7 +76,7 @@ export default function WriteReview() {
         <div className="text-5xl mb-4">🎉</div>
         <h2 className="font-bebas text-3xl tracking-[2px] mb-2" style={{ color: 'var(--fg-text)' }}>Review Submitted</h2>
         <p className="text-sm mb-6" style={{ color: 'var(--fg-muted)' }}>Your review will be published after moderation.</p>
-        <a href={`/#/coaches/${coach.id}`} className="px-6 py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--fg-green)' }}>
+        <a href={`#/coaches/${coach.id}`} className="px-6 py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--fg-green)' }}>
           Back to Coach →
         </a>
       </div>
@@ -125,7 +125,7 @@ export default function WriteReview() {
       <Nav />
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-6 py-10 space-y-6">
         <div>
-          <a href={`/#/coaches/${coach.id}`} className="font-mono text-xs" style={{ color: 'var(--fg-muted)' }}>← Back to coach</a>
+          <a href={`#/coaches/${coach.id}`} className="font-mono text-xs" style={{ color: 'var(--fg-muted)' }}>← Back to coach</a>
           <h1 className="font-bebas text-2xl tracking-[2px] mt-2" style={{ color: 'var(--fg-text)' }}>
             REVIEW: {coach.first_name} {coach.last_name}
           </h1>

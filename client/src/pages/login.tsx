@@ -64,7 +64,7 @@ export default function Login() {
 
           <div className="text-center mt-6">
             <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>Don't have an account? </span>
-            <a href="/#/auth/register" className="text-sm font-semibold" style={{ color: 'var(--fg-green)' }} data-testid="link-register">Sign Up</a>
+            <a href="#/auth/register" className="text-sm font-semibold" style={{ color: 'var(--fg-green)' }} data-testid="link-register">Sign Up</a>
           </div>
         </div>
       </div>
