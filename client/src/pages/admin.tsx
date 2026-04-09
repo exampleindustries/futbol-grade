@@ -1599,21 +1599,40 @@ function ActionBtn({ label, color, loading, onClick }: { label: string; color: '
 }
 
 function BulkToolbar({ count, actions, loading }: { count: number; actions: { label: string; color: 'green' | 'amber' | 'red'; onClick: () => void }[]; loading: boolean }) {
+  const [confirming, setConfirming] = useState<string | null>(null)
   if (count === 0) return null
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl mb-3 border"
-      style={{ background: 'var(--fg-green-pale)', borderColor: 'rgba(26,110,56,.2)' }}>
+      style={{ background: confirming ? 'var(--fg-red-pale)' : 'var(--fg-green-pale)', borderColor: confirming ? 'rgba(192,57,43,.2)' : 'rgba(26,110,56,.2)' }}>
       <input type="checkbox" checked readOnly className="w-4 h-4 rounded" />
       <span className="font-mono text-[11px] font-bold" style={{ color: 'var(--fg-text)' }}>{count} selected</span>
       <div className="flex gap-2 ml-auto">
-        {actions.map(a => (
-          <button key={a.label} onClick={a.onClick} disabled={loading}
-            className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
-            style={{ background: a.color === 'green' ? 'var(--fg-green)' : a.color === 'amber' ? '#f59e0b' : 'var(--fg-red)', color: 'white' }}
-            data-testid={`bulk-${a.label.toLowerCase().replace(/\s/g, '-')}`}>
-            {loading ? '...' : a.label}
-          </button>
-        ))}
+        {confirming ? (
+          <>
+            <span className="font-mono text-[11px] font-semibold" style={{ color: 'var(--fg-red)' }}>Delete {count} items?</span>
+            <button onClick={() => { const a = actions.find(x => x.label === confirming); a?.onClick(); setConfirming(null) }} disabled={loading}
+              className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+              style={{ background: 'var(--fg-red)', color: 'white' }}
+              data-testid="bulk-confirm-delete">
+              {loading ? '...' : 'Yes, Delete'}
+            </button>
+            <button onClick={() => setConfirming(null)}
+              className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
+              style={{ background: 'white', color: 'var(--fg-text2)', borderColor: 'var(--fg-border2)' }}
+              data-testid="bulk-cancel-delete">
+              Cancel
+            </button>
+          </>
+        ) : (
+          actions.map(a => (
+            <button key={a.label} onClick={() => a.color === 'red' ? setConfirming(a.label) : a.onClick()} disabled={loading}
+              className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+              style={{ background: a.color === 'green' ? 'var(--fg-green)' : a.color === 'amber' ? '#f59e0b' : 'var(--fg-red)', color: 'white' }}
+              data-testid={`bulk-${a.label.toLowerCase().replace(/\s/g, '-')}`}>
+              {loading ? '...' : a.label}
+            </button>
+          ))
+        )}
       </div>
     </div>
   )
