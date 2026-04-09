@@ -537,13 +537,14 @@ export async function registerRoutes(
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
-      const { status } = req.body;
-      if (!status || !["active", "removed"].includes(status)) {
-        return res.status(400).json({ error: "status must be 'active' or 'removed'" });
-      }
+      const allowed = ["status", "title", "description", "price_cents", "price_text", "type", "featured"];
+      const updates: Record<string, any> = {};
+      for (const k of allowed) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
+      if (updates.status) updates.approved_at = new Date().toISOString();
+      if (!Object.keys(updates).length) return res.status(400).json({ error: "No valid fields" });
       const { data, error } = await supabase
         .from("listings")
-        .update({ status, approved_at: new Date().toISOString() })
+        .update(updates)
         .eq("id", req.params.id)
         .select()
         .single();

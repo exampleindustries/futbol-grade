@@ -124,6 +124,8 @@ export default function Admin() {
   const [uploadingLogo, setUploadingLogo] = useState<string | null>(null)
   const [editingClub, setEditingClub] = useState<string | null>(null)
   const [clubEdits, setClubEdits] = useState<Record<string, any>>({})
+  const [editingListing, setEditingListing] = useState<string | null>(null)
+  const [listingEdits, setListingEdits] = useState<Record<string, any>>({})
   const [allCoaches, setAllCoaches] = useState<(Coach & { club?: { id: string; name: string; city: string } | null })[]>([])
   const [coachSearch, setCoachSearch] = useState('')
   const [editingCoach, setEditingCoach] = useState<string | null>(null)
@@ -316,6 +318,25 @@ export default function Admin() {
         body: JSON.stringify({ [field]: value }),
       })
       await fetchUsers(userSearch || undefined)
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  async function handleListingSave(id: string) {
+    const edits = listingEdits
+    if (!Object.keys(edits).length) { setEditingListing(null); return }
+    setActionLoading(id)
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/listings/${id}`, {
+        method: 'PATCH',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify(edits),
+      })
+      setEditingListing(null)
+      setListingEdits({})
+      await fetchListings(listingFilter)
+      await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
   }
@@ -626,35 +647,109 @@ export default function Admin() {
             ) : (
               <div className="space-y-3">
                 {listings.map(l => (
-                  <div key={l.id} className="bg-white border rounded-xl p-4 sm:p-5" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-listing-${l.id}`}>
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm truncate" style={{ color: 'var(--fg-text)' }}>{l.title}</div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="font-mono text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded border"
-                            style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)', borderColor: 'rgba(26,110,56,.2)' }}>
-                            {l.type}
-                          </span>
-                          <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>
-                            by {l.seller?.alias_emoji || '⚽'} {l.seller?.alias || 'Seller'} · {timeAgo(l.created_at)}
-                          </span>
+                  <div key={l.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-listing-${l.id}`}>
+                    {editingListing === l.id ? (
+                      /* ── Edit mode ── */
+                      <div className="p-4 space-y-3">
+                        <div>
+                          <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Title</label>
+                          <input value={listingEdits.title || ''} onChange={e => setListingEdits(p => ({ ...p, title: e.target.value }))}
+                            className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                        </div>
+                        <div>
+                          <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Description</label>
+                          <textarea value={listingEdits.description || ''} onChange={e => setListingEdits(p => ({ ...p, description: e.target.value }))} rows={2}
+                            className="w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Category</label>
+                            <select value={listingEdits.type || 'other'} onChange={e => setListingEdits(p => ({ ...p, type: e.target.value }))}
+                              className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }}>
+                              <option value="cleats">Cleats</option>
+                              <option value="jersey">Jersey</option>
+                              <option value="equipment">Equipment</option>
+                              <option value="training">Training</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Price ($)</label>
+                            <input type="number" value={listingEdits.price_cents ? (listingEdits.price_cents / 100) : ''}
+                              onChange={e => setListingEdits(p => ({ ...p, price_cents: e.target.value ? Math.round(parseFloat(e.target.value) * 100) : null }))}
+                              placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                          </div>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Status</label>
+                            <select value={listingEdits.status || 'pending'} onChange={e => setListingEdits(p => ({ ...p, status: e.target.value }))}
+                              className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }}>
+                              <option value="active">Active</option>
+                              <option value="pending">Pending</option>
+                              <option value="removed">Removed</option>
+                              <option value="sold">Sold</option>
+                              <option value="expired">Expired</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={listingEdits.featured || false}
+                              onChange={e => setListingEdits(p => ({ ...p, featured: e.target.checked }))}
+                              className="w-4 h-4 rounded" />
+                            <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Featured</span>
+                          </label>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <ActionBtn label="Save" color="green" loading={actionLoading === l.id} onClick={() => handleListingSave(l.id)} />
+                          <button onClick={() => { setEditingListing(null); setListingEdits({}) }}
+                            className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                            style={{ background: 'var(--fg-surface)', color: 'var(--fg-muted)', borderColor: 'var(--fg-border2)' }}>Cancel</button>
+                          <div className="ml-auto flex gap-2">
+                            <ActionBtn label="Delete" color="red" loading={actionLoading === l.id} onClick={() => handleListingAction(l.id, 'delete')} />
+                          </div>
                         </div>
                       </div>
-                      <div className="font-bebas text-lg" style={{ color: 'var(--fg-green)' }}>
-                        {l.price_cents ? `$${(l.price_cents / 100).toFixed(0)}` : l.price_text || 'Free'}
+                    ) : (
+                      /* ── View mode ── */
+                      <div className="flex items-center gap-4 p-4 sm:p-5">
+                        {l.image_urls?.[0] && (
+                          <img src={l.image_urls[0]} alt={l.title} className="w-14 h-14 rounded-xl object-cover border flex-shrink-0" style={{ borderColor: 'var(--fg-border)' }} />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm truncate" style={{ color: 'var(--fg-text)' }}>{l.title}</span>
+                            <span className="font-mono text-[9px] px-1.5 py-0.5 rounded capitalize"
+                              style={{ background: l.status === 'active' ? 'var(--fg-green-pale)' : l.status === 'removed' ? 'var(--fg-red-pale)' : 'var(--fg-surface)', color: l.status === 'active' ? 'var(--fg-green)' : l.status === 'removed' ? 'var(--fg-red)' : 'var(--fg-muted)' }}>
+                              {l.status}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border capitalize" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-green)' }}>{l.type}</span>
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                              {l.price_cents ? `$${(l.price_cents / 100).toFixed(0)}` : l.price_text || 'Free'}
+                            </span>
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>
+                              {l.seller?.alias_emoji || '⚽'} {l.seller?.alias || 'Seller'}
+                            </span>
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{timeAgo(l.created_at)}</span>
+                            {l.featured && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: '#f59e0b', color: '#f59e0b' }}>★ Featured</span>}
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          setEditingListing(l.id)
+                          setListingEdits({
+                            title: l.title,
+                            description: l.description || '',
+                            type: l.type,
+                            price_cents: l.price_cents,
+                            status: l.status,
+                            featured: l.featured,
+                          })
+                        }}
+                          className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all flex-shrink-0"
+                          style={{ background: 'var(--fg-surface)', color: 'var(--fg-green)', borderColor: 'var(--fg-green)' }}>Edit</button>
                       </div>
-                    </div>
-                    {l.description && <p className="text-sm mb-3 line-clamp-2" style={{ color: 'var(--fg-text2)' }}>{l.description}</p>}
-
-                    <div className="flex gap-2 pt-3 border-t" style={{ borderColor: 'var(--fg-border)' }}>
-                      {listingFilter !== 'active' && (
-                        <ActionBtn label="Approve" color="green" loading={actionLoading === l.id} onClick={() => handleListingAction(l.id, 'active')} />
-                      )}
-                      {listingFilter !== 'removed' && (
-                        <ActionBtn label="Remove" color="amber" loading={actionLoading === l.id} onClick={() => handleListingAction(l.id, 'removed')} />
-                      )}
-                      <ActionBtn label="Delete" color="red" loading={actionLoading === l.id} onClick={() => handleListingAction(l.id, 'delete')} />
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
