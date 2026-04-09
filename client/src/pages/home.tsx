@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Coach, Club } from '@/lib/types'
 import { Nav } from '@/components/layout/Nav'
-import { initials } from '@/lib/fg-utils'
+import { ClubBadge } from '@/components/ui/ClubBadge'
 
 function CompactCoachCard({ coach }: { coach: Coach }) {
   const [expanded, setExpanded] = useState(false)
@@ -23,10 +23,7 @@ function CompactCoachCard({ coach }: { coach: Coach }) {
     >
       <div className="p-5">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bebas text-sm border flex-shrink-0"
-            style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)', borderColor: 'var(--fg-border)' }}>
-            {initials(coach.first_name, coach.last_name)}
-          </div>
+          <ClubBadge clubName={(coach.club as any)?.name} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-sm truncate" style={{ color: 'var(--fg-text)' }}>{coach.first_name} {coach.last_name}</div>
             <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{coach.city || 'SoCal'}</div>

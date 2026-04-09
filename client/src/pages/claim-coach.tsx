@@ -3,7 +3,8 @@ import { useRoute, useLocation } from 'wouter'
 import { supabase } from '@/lib/supabase'
 import { Nav } from '@/components/layout/Nav'
 import { useAuth } from '@/hooks/use-auth'
-import { initials, fullName } from '@/lib/fg-utils'
+import { fullName } from '@/lib/fg-utils'
+import { ClubBadge } from '@/components/ui/ClubBadge'
 import type { Coach } from '@/lib/types'
 
 function getApiBase() {
@@ -157,10 +158,7 @@ export default function ClaimCoach() {
         {/* Header card */}
         <div className="bg-white border rounded-2xl p-6 mb-6" style={{ borderColor: 'var(--fg-border)' }}>
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-bebas text-xl border-2 flex-shrink-0"
-              style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)', borderColor: 'var(--fg-border)' }}>
-              {initials(coach.first_name, coach.last_name)}
-            </div>
+            <ClubBadge clubName={(coach.club as any)?.name} size="md" />
             <div>
               <h1 className="font-bebas text-2xl tracking-[2px] leading-tight" style={{ color: 'var(--fg-text)' }}>
                 CLAIM PROFILE

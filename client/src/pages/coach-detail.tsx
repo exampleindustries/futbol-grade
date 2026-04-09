@@ -9,6 +9,7 @@ import { KpiBar } from '@/components/ui/KpiBar'
 import { fullName, initials, timeAgo } from '@/lib/fg-utils'
 import { useAuth } from '@/hooks/use-auth'
 import { useHead } from '@/hooks/use-head'
+import { ClubBadge } from '@/components/ui/ClubBadge'
 
 export default function CoachDetail() {
   const [, params] = useRoute('/coaches/:id')
@@ -68,12 +69,7 @@ export default function CoachDetail() {
         {/* Header */}
         <div className="bg-white border rounded-2xl p-6 md:p-8 mb-6" style={{ borderColor: 'var(--fg-border)' }}>
           <div className="flex items-start gap-4 md:gap-6">
-            <div
-              className="w-14 h-14 md:w-20 md:h-20 rounded-2xl flex items-center justify-center font-bebas text-xl md:text-3xl flex-shrink-0 border-2"
-              style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)', borderColor: 'var(--fg-border)' }}
-            >
-              {initials(coach.first_name, coach.last_name)}
-            </div>
+            <ClubBadge clubName={(coach.club as any)?.name} size="lg" />
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 flex-wrap">

@@ -1,4 +1,5 @@
-import { getRatingColor, getBarWidth, initials } from '@/lib/fg-utils'
+import { getRatingColor, getBarWidth } from '@/lib/fg-utils'
+import { ClubBadge } from '@/components/ui/ClubBadge'
 import { KPI_AVG_KEYS, KPI_LABELS, type Coach } from '@/lib/types'
 import { RatingBadge } from '@/components/ui/RatingBadge'
 
@@ -17,12 +18,7 @@ export function CoachCard({ coach }: { coach: Coach }) {
         <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: color }} />
 
         <div className="flex items-start gap-3 mb-4 mt-1">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center font-bebas text-xl flex-shrink-0 border-[1.5px]"
-            style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)', borderColor: 'var(--fg-border)' }}
-          >
-            {initials(coach.first_name, coach.last_name)}
-          </div>
+          <ClubBadge clubName={(coach.club as any)?.name} size="md" />
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-[15px] truncate" style={{ color: 'var(--fg-text)' }}>
               {coach.first_name} {coach.last_name}
