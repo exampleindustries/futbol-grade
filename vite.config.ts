@@ -19,8 +19,22 @@ function stripForbiddenApis(): Plugin {
   }
 }
 
+// Inject build timestamp for cache-busting detection
+function injectBuildVersion(): Plugin {
+  const version = Date.now().toString(36)
+  return {
+    name: 'inject-build-version',
+    transformIndexHtml(html) {
+      return html.replace('</head>', `<meta name="build-version" content="${version}" />\n  </head>`)
+    },
+    config() {
+      return { define: { __BUILD_VERSION__: JSON.stringify(version) } }
+    }
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), stripForbiddenApis()],
+  plugins: [react(), stripForbiddenApis(), injectBuildVersion()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

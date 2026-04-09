@@ -4,3 +4,17 @@ compatibility_date = "2026-04-09"
 [assets]
 directory = "dist/public"
 not_found_handling = "single-page-application"
+
+# Cache JS/CSS forever (content-hashed filenames), never cache HTML
+[assets.serving]
+html_handling = "auto-trailing-slash"
+
+[[assets.serving.headers.rules]]
+glob = "*.html"
+[assets.serving.headers.rules.headers]
+Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[assets.serving.headers.rules]]
+glob = "assets/*"
+[assets.serving.headers.rules.headers]
+Cache-Control = "public, max-age=31536000, immutable"

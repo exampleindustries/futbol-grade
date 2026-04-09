@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router } from "wouter";
 
 import { queryClient } from "./lib/queryClient";
@@ -46,7 +47,28 @@ function AppRouter() {
   );
 }
 
+declare const __BUILD_VERSION__: string;
+
+// Check for new deploys every 2 minutes — auto-reload if stale
+function useVersionCheck() {
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/?_v=' + Date.now(), { cache: 'no-store' });
+        const html = await res.text();
+        const match = html.match(/build-version["']\s*content=["']([^"']+)/);
+        if (match && match[1] !== __BUILD_VERSION__) {
+          console.log('[VERSION] New deploy detected, reloading...');
+          window.location.reload();
+        }
+      } catch { /* ignore */ }
+    }, 120_000);
+    return () => clearInterval(interval);
+  }, []);
+}
+
 function App() {
+  useVersionCheck();
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
