@@ -61,7 +61,18 @@ function AdminLoginForm() {
   )
 }
 
-type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users'
+type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs'
+
+interface AdminClub {
+  id: string
+  name: string
+  city: string
+  state: string
+  logo_url: string | null
+  status: string
+  coach_count: number
+  avg_overall: number
+}
 
 interface AdminUser {
   id: string
@@ -104,6 +115,8 @@ export default function Admin() {
   const [selectedImports, setSelectedImports] = useState<Set<string>>(new Set())
   const [users, setUsers] = useState<AdminUser[]>([])
   const [userSearch, setUserSearch] = useState('')
+  const [adminClubs, setAdminClubs] = useState<AdminClub[]>([])
+  const [uploadingLogo, setUploadingLogo] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -161,6 +174,16 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchClubs = useCallback(async () => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`${getApiBase()}/api/admin/clubs`, { headers: { Authorization: auth } })
+      if (res.ok) setAdminClubs(await res.json())
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   const fetchUsers = useCallback(async (search?: string) => {
     setLoading(true)
     try {
@@ -178,6 +201,7 @@ export default function Admin() {
   useEffect(() => { if (profile?.is_admin && tab === 'claims') fetchClaims(claimFilter) }, [profile, tab, claimFilter, fetchClaims])
   useEffect(() => { if (profile?.is_admin && tab === 'imports') fetchImports(importFilter) }, [profile, tab, importFilter, fetchImports])
   useEffect(() => { if (profile?.is_admin && tab === 'users') fetchUsers() }, [profile, tab, fetchUsers])
+  useEffect(() => { if (profile?.is_admin && tab === 'clubs') fetchClubs() }, [profile, tab, fetchClubs])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
     setActionLoading(id)
@@ -213,6 +237,39 @@ export default function Admin() {
       await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
+  }
+
+  async function handleLogoUpload(clubId: string, clubName: string, file: File) {
+    setUploadingLogo(clubId)
+    try {
+      const ext = file.name.split('.').pop() || 'png'
+      const path = `${clubId}.${ext}`
+      const { error: uploadErr } = await supabase.storage.from('club-logos').upload(path, file, { upsert: true, contentType: file.type })
+      if (uploadErr) throw uploadErr
+      const { data: urlData } = supabase.storage.from('club-logos').getPublicUrl(path)
+      const logoUrl = urlData.publicUrl + '?v=' + Date.now()
+      // Update club record
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/clubs/${clubId}`, {
+        method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logo_url: logoUrl }),
+      })
+      await fetchClubs()
+    } catch (err: any) {
+      alert('Upload failed: ' + (err.message || 'Unknown error'))
+    }
+    setUploadingLogo(null)
+  }
+
+  async function handleClubUpdate(clubId: string, field: string, value: string) {
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/clubs/${clubId}`, {
+        method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      await fetchClubs()
+    } catch { /* ignore */ }
   }
 
   async function handleUserAction(userId: string, field: 'is_admin' | 'is_banned', value: boolean) {
@@ -364,8 +421,8 @@ export default function Admin() {
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings', 'claims', 'imports', 'users'] as Tab[]).map(t => {
-            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : users.length) : 0
+          {(['reviews', 'listings', 'claims', 'imports', 'users', 'clubs'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'users' ? users.length : adminClubs.length) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
                 className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
@@ -592,6 +649,66 @@ export default function Admin() {
             )}
           </>
         )}
+        {/* Clubs tab */}
+        {tab === 'clubs' && (
+          <>
+            {loading ? <Skeleton /> : adminClubs.length === 0 ? (
+              <EmptyState text="No clubs found" />
+            ) : (
+              <div className="space-y-3">
+                {adminClubs.map(c => (
+                  <div key={c.id} className="bg-white border rounded-xl p-4 sm:p-5 flex items-center gap-4" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-club-${c.id}`}>
+                    {/* Logo */}
+                    <div className="flex-shrink-0">
+                      {c.logo_url ? (
+                        <img src={c.logo_url} alt={c.name} className="w-14 h-14 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
+                      ) : (
+                        <div className="w-14 h-14 rounded-xl flex items-center justify-center border-2 border-dashed" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-muted)' }}>
+                          <span className="text-[10px] font-mono">No logo</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{c.name}</div>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                          {c.city}, {c.state}
+                        </span>
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>
+                          {c.coach_count} coach{c.coach_count !== 1 ? 'es' : ''}
+                        </span>
+                        {c.avg_overall > 0 && (
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-green)' }}>
+                            ★ {c.avg_overall.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Upload */}
+                    <div className="flex-shrink-0">
+                      <label className="cursor-pointer">
+                        <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (file) handleLogoUpload(c.id, c.name, file)
+                            e.target.value = ''
+                          }} />
+                        <span className="font-mono text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all hover:bg-gray-50 inline-block"
+                          style={{ borderColor: 'var(--fg-border2)', color: uploadingLogo === c.id ? 'var(--fg-muted)' : 'var(--fg-green)' }}>
+                          {uploadingLogo === c.id ? 'Uploading...' : c.logo_url ? 'Replace Logo' : 'Upload Logo'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
         {/* Users tab */}
         {tab === 'users' && (
           <>

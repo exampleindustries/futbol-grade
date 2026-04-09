@@ -23,7 +23,7 @@ function CompactCoachCard({ coach }: { coach: Coach }) {
     >
       <div className="p-5">
         <div className="flex items-center gap-3 mb-3">
-          <ClubBadge clubName={(coach.club as any)?.name} size="sm" />
+          <ClubBadge clubName={(coach.club as any)?.name} logoUrl={(coach.club as any)?.logo_url} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-sm truncate" style={{ color: 'var(--fg-text)' }}>{coach.first_name} {coach.last_name}</div>
             <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{coach.city || 'SoCal'}</div>

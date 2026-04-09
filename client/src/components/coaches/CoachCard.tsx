@@ -18,7 +18,7 @@ export function CoachCard({ coach }: { coach: Coach }) {
         <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl" style={{ background: color }} />
 
         <div className="flex items-start gap-3 mb-4 mt-1">
-          <ClubBadge clubName={(coach.club as any)?.name} size="md" />
+          <ClubBadge clubName={(coach.club as any)?.name} logoUrl={(coach.club as any)?.logo_url} size="md" />
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-[15px] truncate" style={{ color: 'var(--fg-text)' }}>
               {coach.first_name} {coach.last_name}

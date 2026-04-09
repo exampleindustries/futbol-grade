@@ -42,7 +42,7 @@ function abbreviate(name: string) {
   return words.map(w => w[0]).join('').slice(0, 4).toUpperCase()
 }
 
-export function ClubBadge({ clubName, size = 'md' }: { clubName?: string | null; size?: 'sm' | 'md' | 'lg' }) {
+export function ClubBadge({ clubName, logoUrl, size = 'md' }: { clubName?: string | null; logoUrl?: string | null; size?: 'sm' | 'md' | 'lg' }) {
   const name = clubName || 'Club'
   const color = CLUB_COLORS[name] || FALLBACK_COLORS[hashName(name) % FALLBACK_COLORS.length]
   const abbr = abbreviate(name)
@@ -51,6 +51,14 @@ export function ClubBadge({ clubName, size = 'md' }: { clubName?: string | null;
     sm: 'w-8 h-8 text-[9px]',
     md: 'w-12 h-12 text-[11px]',
     lg: 'w-14 h-14 text-sm',
+  }
+
+  if (logoUrl) {
+    return (
+      <img src={logoUrl} alt={name}
+        className={`${sizes[size]} rounded-xl object-contain flex-shrink-0 border`}
+        style={{ borderColor: 'rgba(0,0,0,0.08)' }} />
+    )
   }
 
   return (

@@ -69,7 +69,7 @@ export default function CoachDetail() {
         {/* Header */}
         <div className="bg-white border rounded-2xl p-6 md:p-8 mb-6" style={{ borderColor: 'var(--fg-border)' }}>
           <div className="flex items-start gap-4 md:gap-6">
-            <ClubBadge clubName={(coach.club as any)?.name} size="lg" />
+            <ClubBadge clubName={(coach.club as any)?.name} logoUrl={(coach.club as any)?.logo_url} size="lg" />
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 flex-wrap">

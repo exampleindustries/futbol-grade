@@ -754,6 +754,35 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Admin: Clubs ──────────────────────────────────────
+
+  app.get("/api/admin/clubs", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { data, error } = await supabase
+        .from("clubs")
+        .select("id, name, city, state, region, logo_url, status, coach_count, avg_overall")
+        .order("name");
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.patch("/api/admin/clubs/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const allowed = ["name", "city", "state", "logo_url", "status"];
+      const updates: Record<string, any> = {};
+      for (const k of allowed) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
+      if (!Object.keys(updates).length) return res.status(400).json({ error: "No valid fields" });
+      const { error } = await supabase.from("clubs").update(updates).eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   // ── Admin: Users ───────────────────────────────────────
 
   app.get("/api/admin/users", async (req, res) => {

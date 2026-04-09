@@ -158,7 +158,7 @@ export default function ClaimCoach() {
         {/* Header card */}
         <div className="bg-white border rounded-2xl p-6 mb-6" style={{ borderColor: 'var(--fg-border)' }}>
           <div className="flex items-center gap-4 mb-4">
-            <ClubBadge clubName={(coach.club as any)?.name} size="md" />
+            <ClubBadge clubName={(coach.club as any)?.name} logoUrl={(coach.club as any)?.logo_url} size="md" />
             <div>
               <h1 className="font-bebas text-2xl tracking-[2px] leading-tight" style={{ color: 'var(--fg-text)' }}>
                 CLAIM PROFILE
