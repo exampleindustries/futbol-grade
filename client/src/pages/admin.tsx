@@ -1645,7 +1645,8 @@ export default function Admin() {
 
 function getApiBase() {
   const base = "__PORT_5000__"
-  return base.startsWith("__") ? "" : base
+  if (!base.startsWith("__")) return base
+  return import.meta.env.VITE_API_URL || ''
 }
 
 function StatCard({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
