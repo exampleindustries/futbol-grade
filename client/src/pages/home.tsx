@@ -210,18 +210,18 @@ export default function Home() {
       {/* Recently Reviewed — Carousel */}
       <section className="py-12" style={{ background: '#f0f5f1' }}>
         <div className="max-w-6xl mx-auto px-6">
-          <div className="flex items-center justify-between mb-6 border rounded-xl px-5 py-4" style={{ background: 'linear-gradient(135deg, #fef9ec 0%, #fdf3d7 100%)', borderColor: '#f0d68a' }}>
+          <div className="flex items-center justify-between mb-6 rounded-xl px-5 py-4" style={{ background: 'linear-gradient(135deg, #c9a227 0%, #dbb730 50%, #e6c94a 100%)', boxShadow: '0 2px 12px rgba(180,140,20,.25)' }}>
             <div>
-              <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b8860b' }}>Recently Reviewed</span>
-              <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: '#5c4813' }}>TOP RATED COACHES</h2>
+              <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.7)' }}>Recently Reviewed</span>
+              <h2 className="font-bebas text-2xl tracking-[2px] mt-1 text-white">TOP RATED COACHES</h2>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => scrollCarousel(-1)} className="w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-gray-50 transition-colors"
-                style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }} data-testid="carousel-prev">&#8249;</button>
-              <button onClick={() => scrollCarousel(1)} className="w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-gray-50 transition-colors"
-                style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }} data-testid="carousel-next">&#8250;</button>
-              <a href="/coaches" className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all hover:bg-gray-50 ml-2"
-                style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }} data-testid="see-all-coaches">
+              <button onClick={() => scrollCarousel(-1)} className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+                style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }} data-testid="carousel-prev">&#8249;</button>
+              <button onClick={() => scrollCarousel(1)} className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+                style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }} data-testid="carousel-next">&#8250;</button>
+              <a href="/coaches" className="font-mono text-xs font-semibold px-4 py-2 rounded-lg transition-all ml-2"
+                style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }} data-testid="see-all-coaches">
                 See All →
               </a>
             </div>
