@@ -108,8 +108,20 @@ function RegionModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   const [locStatus, setLocStatus] = useState<'idle' | 'loading' | 'granted' | 'denied'>('idle')
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [radius, setRadius] = useState(25)
-  const [clubs, setClubs] = useState<(Club & { distance: number })[]>([])
+  const [clubs, setClubs] = useState<(Club & { distance?: number })[]>([])
   const [loading, setLoading] = useState(false)
+
+  // Fetch all clubs alphabetically (fallback)
+  async function fetchAllClubs() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('clubs')
+      .select('id, name, city, state, logo_url, coach_count, avg_overall')
+      .eq('status', 'approved')
+      .order('name')
+    setClubs((data || []) as any)
+    setLoading(false)
+  }
 
   function requestLocation() {
     setLocStatus('loading')
@@ -118,7 +130,10 @@ function RegionModal({ open, onClose }: { open: boolean; onClose: () => void }) 
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
         setLocStatus('granted')
       },
-      () => setLocStatus('denied'),
+      () => {
+        setLocStatus('denied')
+        fetchAllClubs()
+      },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
@@ -157,12 +172,8 @@ function RegionModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             </div>
           )}
           {locStatus === 'denied' && (
-            <div className="mt-4 px-4 py-3 rounded-xl border text-center"
-              style={{ borderColor: 'rgba(192,57,43,.2)', background: 'var(--fg-red-pale)' }}>
-              <p className="text-sm font-medium" style={{ color: 'var(--fg-red)' }}>Location access denied</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>Enable location in your browser settings and try again</p>
-              <button onClick={requestLocation} className="mt-2 font-mono text-xs font-semibold px-4 py-1.5 rounded-lg"
-                style={{ background: 'var(--fg-surface)', color: 'var(--fg-text2)', border: '1px solid var(--fg-border2)' }}>Try Again</button>
+            <div className="mt-3">
+              <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Showing all clubs (A-Z)</span>
             </div>
           )}
           {locStatus === 'granted' && (
@@ -182,7 +193,7 @@ function RegionModal({ open, onClose }: { open: boolean; onClose: () => void }) 
           )}
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {locStatus !== 'granted' ? (
+          {locStatus === 'idle' || locStatus === 'loading' ? (
             <div className="text-center py-8">
               <div className="text-3xl mb-2">📍</div>
               <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Share your location to find nearby clubs</p>
@@ -197,7 +208,9 @@ function RegionModal({ open, onClose }: { open: boolean; onClose: () => void }) 
             </div>
           ) : (
             <div className="space-y-2">
-              <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>{clubs.length} clubs within {radius} miles (A-Z)</span>
+              <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>
+                {locStatus === 'granted' ? `${clubs.length} clubs within ${radius} miles (A-Z)` : `${clubs.length} clubs (A-Z)`}
+              </span>
               {clubs.map(c => (
                 <a key={c.id} href={`/clubs/${c.id}`}
                   className="flex items-center gap-3 p-3 rounded-xl border hover:shadow-md transition-all"
@@ -208,7 +221,9 @@ function RegionModal({ open, onClose }: { open: boolean; onClose: () => void }) 
                     <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{c.city}, {c.state}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bebas text-lg" style={{ color: 'var(--fg-green)' }}>{(c as any).distance} mi</div>
+                    {(c as any).distance != null && (
+                      <div className="font-bebas text-lg" style={{ color: 'var(--fg-green)' }}>{(c as any).distance} mi</div>
+                    )}
                     <div className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>{c.coach_count} coaches</div>
                   </div>
                 </a>
