@@ -49,6 +49,13 @@ export default function Login() {
                 data-testid="login-password" />
             </div>
 
+            <div className="text-right">
+              <a href="/auth/forgot-password" className="font-mono text-[11px] font-semibold hover:underline"
+                style={{ color: 'var(--fg-green)' }} data-testid="link-forgot-password">
+                Forgot password?
+              </a>
+            </div>
+
             {error && (
               <div className="text-sm font-medium px-4 py-3 rounded-lg border"
                 style={{ background: 'var(--fg-red-pale)', color: 'var(--fg-red)', borderColor: 'rgba(192,57,43,.2)' }}>{error}</div>
