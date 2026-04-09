@@ -42,8 +42,12 @@ export function useAuth() {
     if (error) throw error
   }
 
-  async function signUp(email: string, password: string) {
-    const { error } = await supabase.auth.signUp({ email, password })
+  async function signUp(email: string, password: string, meta?: { favorite_league?: string; favorite_team?: string }) {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: meta ? { data: meta } : undefined,
+    })
     if (error) throw error
   }
 

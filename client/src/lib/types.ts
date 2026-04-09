@@ -15,6 +15,8 @@ export interface Profile {
   prefer_anonymous: boolean
   role: string
   is_admin: boolean
+  favorite_league: string | null
+  favorite_team: string | null
   created_at: string
   updated_at: string
 }
