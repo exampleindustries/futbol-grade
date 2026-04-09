@@ -34,8 +34,9 @@ export default function Home() {
       <Nav />
 
       {/* Hero */}
-      <section className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #1a2e22 0%, #1a6e38 50%, #22903f 100%)' }}>
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(46,170,80,0.3) 0%, transparent 40%)' }} />
+      <section className="relative overflow-hidden" style={{ minHeight: 520 }}>
+        <div className="absolute inset-0" style={{ backgroundImage: 'url(/hero-stadium.jpg)', backgroundSize: 'cover', backgroundPosition: 'center 40%' }} />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(10,30,18,0.88) 0%, rgba(20,80,40,0.82) 50%, rgba(26,60,36,0.85) 100%)' }} />
         <div className="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-3 h-3 rounded-full rating-pulse" style={{ background: '#2eaa50' }} />
