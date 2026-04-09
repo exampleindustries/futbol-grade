@@ -376,9 +376,10 @@ export async function registerRoutes(
             "Avg Score": `${avgScore.toFixed(1)} / 5.0`,
             Excerpt: (body.body || "No written review").substring(0, 120),
           });
-          if (coach?.email) {
-            sendCoachAlert(coach.email, coach.first_name, scores, body.coach_id);
-          }
+          // Coach email alerts disabled for now
+          // if (coach?.email) {
+          //   sendCoachAlert(coach.email, coach.first_name, scores, body.coach_id);
+          // }
         })
         .catch(() => {});
 
@@ -678,9 +679,9 @@ export async function registerRoutes(
           .update({ user_id: claim.user_id, email: claim.email })
           .eq("id", claim.coach_id);
 
-        // Fire-and-forget approval email to coach
-        const coachName = claim.coach ? `${claim.coach.first_name}` : "Coach";
-        sendClaimApprovalEmail(claim.email, coachName, claim.coach_id).catch(() => {});
+        // Coach approval email disabled for now
+        // const coachName = claim.coach ? `${claim.coach.first_name}` : "Coach";
+        // sendClaimApprovalEmail(claim.email, coachName, claim.coach_id).catch(() => {});
       }
 
       return res.json({ ok: true });

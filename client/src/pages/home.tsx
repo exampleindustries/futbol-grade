@@ -190,7 +190,7 @@ export default function Home() {
             {[
               { step: '01', icon: '\ud83d\udd0d', title: 'Find a Coach', desc: 'Browse coaches by club, city, or age group. Every SoCal youth coach has a profile with their rating breakdown.' },
               { step: '02', icon: '\u2b50', title: 'Rate Honestly', desc: 'Score coaches across 6 categories \u2014 technical skills, team building, development, approachability, professionalism, and dedication. All reviews are anonymous.' },
-              { step: '03', icon: '\ud83d\udee1\ufe0f', title: 'Community Verified', desc: 'Every review goes through moderation before publishing. Coaches can claim their profile, get verified, and receive email alerts on new reviews.' },
+              { step: '03', icon: '\ud83d\udee1\ufe0f', title: 'Community Verified', desc: 'Every review goes through moderation before publishing. Coaches can claim their profile and get a verified badge on their page.' },
             ].map(item => (
               <div key={item.step} className="bg-white border rounded-2xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
                 <div className="text-3xl mb-3">{item.icon}</div>
@@ -211,7 +211,7 @@ export default function Home() {
       </section>
 
       {/* Recently Reviewed — Carousel */}
-      <section className="py-12">
+      <section className="py-12" style={{ background: '#f0f5f1' }}>
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex items-center justify-between mb-6">
             <div>

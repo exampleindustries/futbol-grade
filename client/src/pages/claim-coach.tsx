@@ -172,7 +172,7 @@ export default function ClaimCoach() {
             </div>
           </div>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--fg-text2)' }}>
-            Are you <strong>{coach.first_name} {coach.last_name}</strong>? Claim this profile to receive review notifications, update your info, and show a verified badge.
+            Are you <strong>{coach.first_name} {coach.last_name}</strong>? Claim this profile to update your info and show a verified badge.
           </p>
         </div>
 
