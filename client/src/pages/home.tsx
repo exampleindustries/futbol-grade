@@ -207,6 +207,33 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Browse Categories — Dark Section */}
+      <section style={{ background: '#1a3c24' }}>
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <div className="text-center mb-10">
+            <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: '#4ade80' }}>Explore</span>
+            <h2 className="font-bebas text-3xl tracking-[2px] mt-1 text-white">BROWSE BY CATEGORY</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[
+              { icon: '\u26bd', title: 'Clubs', desc: 'All SoCal youth soccer clubs ranked by community ratings', href: '/clubs' },
+              { icon: '\ud83d\udcc5', title: 'By Age Group', desc: 'Find coaches for U8, U10, U12, U14, U16, and U18 teams', href: '/coaches' },
+              { icon: '\ud83d\udccd', title: 'By Region', desc: 'San Diego, LA, Orange County, Inland Empire, and more', href: '/coaches' },
+              { icon: '\ud83c\udfc6', title: 'Events & Programs', desc: 'Camps, clinics, tournaments, and training programs', href: '/marketplace' },
+            ].map(cat => (
+              <a key={cat.title} href={cat.href}
+                className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg"
+                style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(74,222,128,0.15)' }}
+                data-testid={`category-${cat.title.toLowerCase().replace(/[^a-z]/g, '-')}`}>
+                <div className="text-3xl mb-3">{cat.icon}</div>
+                <h3 className="font-bebas text-xl tracking-[1px] text-white mb-1 group-hover:text-green-400 transition-colors">{cat.title.toUpperCase()}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{cat.desc}</p>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Recently Reviewed — Carousel */}
       <section className="py-12" style={{ background: '#f0f5f1' }}>
         <div className="max-w-6xl mx-auto px-6">
@@ -251,33 +278,6 @@ export default function Home() {
           </div>
         </div>
         <ClubMarquee clubs={clubs} />
-      </section>
-
-      {/* Browse Categories — Dark Section */}
-      <section style={{ background: '#1a3c24' }}>
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <div className="text-center mb-10">
-            <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: '#4ade80' }}>Explore</span>
-            <h2 className="font-bebas text-3xl tracking-[2px] mt-1 text-white">BROWSE BY CATEGORY</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              { icon: '\u26bd', title: 'Clubs', desc: 'All SoCal youth soccer clubs ranked by community ratings', href: '/clubs' },
-              { icon: '\ud83d\udcc5', title: 'By Age Group', desc: 'Find coaches for U8, U10, U12, U14, U16, and U18 teams', href: '/coaches' },
-              { icon: '\ud83d\udccd', title: 'By Region', desc: 'San Diego, LA, Orange County, Inland Empire, and more', href: '/coaches' },
-              { icon: '\ud83c\udfc6', title: 'Events & Programs', desc: 'Camps, clinics, tournaments, and training programs', href: '/marketplace' },
-            ].map(cat => (
-              <a key={cat.title} href={cat.href}
-                className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg"
-                style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(74,222,128,0.15)' }}
-                data-testid={`category-${cat.title.toLowerCase().replace(/[^a-z]/g, '-')}`}>
-                <div className="text-3xl mb-3">{cat.icon}</div>
-                <h3 className="font-bebas text-xl tracking-[1px] text-white mb-1 group-hover:text-green-400 transition-colors">{cat.title.toUpperCase()}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{cat.desc}</p>
-              </a>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* Footer */}
