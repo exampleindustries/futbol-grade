@@ -489,6 +489,29 @@ export async function registerRoutes(
     return supabase;
   }
 
+  async function logAudit(
+    supabase: ReturnType<typeof getSupabaseClient>,
+    action: string,
+    entityType: string,
+    entityIds: string[],
+    details?: Record<string, any>
+  ) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("admin_audit_log").insert({
+        admin_id: user?.id || null,
+        admin_email: user?.email || null,
+        action,
+        entity_type: entityType,
+        entity_ids: entityIds,
+        entity_count: entityIds.length,
+        details: details || {},
+      });
+    } catch (err) {
+      console.error("[AUDIT] Failed to log:", err);
+    }
+  }
+
   // ── Admin: Reviews ───────────────────────────────────────────
 
   app.get("/api/admin/reviews", async (req, res) => {
@@ -533,6 +556,7 @@ export async function registerRoutes(
       const { error } = await supabase.from("reviews").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
       return res.json({ ok: true });
+      await logAudit(supabase, "delete", "review", [req.params.id]);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -581,6 +605,7 @@ export async function registerRoutes(
       const { error } = await supabase.from("listings").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
       return res.json({ ok: true });
+      await logAudit(supabase, "delete", "listing", [req.params.id]);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -599,6 +624,7 @@ export async function registerRoutes(
         if (error) return res.status(400).json({ error: error.message });
       }
       return res.json({ ok: true });
+      await logAudit(supabase, status === "delete" ? "bulk_delete" : "bulk_status_change", "listing", ids, { new_status: status });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -723,6 +749,7 @@ export async function registerRoutes(
         if (error) return res.status(400).json({ error: error.message });
       }
       return res.json({ ok: true });
+      await logAudit(supabase, status === "delete" ? "bulk_delete" : "bulk_status_change", "coach", ids, { new_status: status });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -733,6 +760,7 @@ export async function registerRoutes(
       const { error } = await supabase.from("coaches").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
       return res.json({ ok: true });
+      await logAudit(supabase, "delete", "coach", [req.params.id]);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -801,6 +829,7 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("coach_claims").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "delete", "claim", [req.params.id]);
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
@@ -856,6 +885,7 @@ export async function registerRoutes(
       if (!ids?.length || !status) return res.status(400).json({ error: "ids array and status required" });
       const { error } = await supabase.from("clubs").update({ status }).in("id", ids);
       if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "bulk_status_change", "club", ids, { new_status: status });
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
@@ -1050,6 +1080,7 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("events").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "delete", "event", [req.params.id]);
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
