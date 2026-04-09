@@ -30,6 +30,8 @@ const viewLimiter = rateLimit({
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "racampos@exampleindustries.com";
 
 function getSupabaseClient(authHeader?: string) {
   if (authHeader) {
@@ -39,6 +41,74 @@ function getSupabaseClient(authHeader?: string) {
     });
   }
   return createClient(supabaseUrl, supabaseKey);
+}
+
+// ── Email alert helpers ────────────────────────────────────────
+
+function buildAlertHtml(type: "review" | "listing", details: Record<string, string>) {
+  const heading = type === "review"
+    ? "New Coach Review Submitted"
+    : "New Marketplace Listing Submitted";
+
+  const rows = Object.entries(details)
+    .map(
+      ([label, value]) => `
+      <tr>
+        <td style="padding:8px 12px;font-weight:600;color:#1a3c24;white-space:nowrap;vertical-align:top;">${label}</td>
+        <td style="padding:8px 12px;color:#374151;">${value}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;"><tr><td align="center">
+    <table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+      <tr><td style="background:#1a3c24;padding:20px 24px;">
+        <span style="color:#4ade80;font-size:20px;font-weight:700;">&#9917; Futbol Grade</span>
+      </td></tr>
+      <tr><td style="padding:24px;">
+        <h2 style="margin:0 0 16px;color:#1a3c24;font-size:18px;">${heading}</h2>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:20px;">
+          ${rows}
+        </table>
+        <a href="https://exampleindustries.github.io/futbol-grade/#/admin"
+           style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">
+          Review in Admin Panel &#8594;
+        </a>
+      </td></tr>
+      <tr><td style="padding:16px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+        <span style="color:#9ca3af;font-size:12px;">Automated alert from Futbol Grade</span>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+}
+
+async function sendAdminAlert(type: "review" | "listing", details: Record<string, string>) {
+  if (!RESEND_API_KEY) return;
+  const subject = type === "review"
+    ? "New coach review awaiting moderation"
+    : "New listing awaiting moderation";
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Futbol Grade <onboarding@resend.dev>",
+        to: [ADMIN_EMAIL],
+        subject,
+        html: buildAlertHtml(type, details),
+      }),
+    });
+    if (!resp.ok) console.error("Email alert error:", await resp.text());
+  } catch (err) {
+    console.error("Email alert failed:", err);
+  }
 }
 
 export async function registerRoutes(
@@ -108,6 +178,26 @@ export async function registerRoutes(
         return res.status(400).json({ error: error.message });
       }
 
+      // Fire-and-forget admin email alert
+      const avgScore = (
+        body.score_technical + body.score_team_building + body.score_development +
+        body.score_approachability + body.score_professionalism + body.score_dedication
+      ) / 6;
+      supabase
+        .from("coaches")
+        .select("first_name, last_name")
+        .eq("id", body.coach_id)
+        .single()
+        .then(({ data: coach }) => {
+          const name = coach ? `${coach.first_name} ${coach.last_name}` : `Coach #${body.coach_id}`;
+          sendAdminAlert("review", {
+            Coach: name,
+            "Avg Score": `${avgScore.toFixed(1)} / 5.0`,
+            Excerpt: (body.body || "No written review").substring(0, 120),
+          });
+        })
+        .catch(() => {});
+
       return res.json(data);
     } catch (err: any) {
       console.error("Review error:", err);
@@ -152,6 +242,13 @@ export async function registerRoutes(
       if (error) {
         return res.status(400).json({ error: error.message });
       }
+
+      // Fire-and-forget admin email alert
+      sendAdminAlert("listing", {
+        Title: listing.title,
+        Type: listing.type,
+        Price: listing.price_text,
+      }).catch(() => {});
 
       return res.json(data);
     } catch (err: any) {
