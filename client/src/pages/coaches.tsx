@@ -4,13 +4,33 @@ import type { Coach } from '@/lib/types'
 import { CoachCard } from '@/components/coaches/CoachCard'
 import { Nav } from '@/components/layout/Nav'
 
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 3959
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 export default function Coaches() {
   const [coaches, setCoaches] = useState<Coach[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [sortMode, setSortMode] = useState<'alpha' | 'nearby' | 'rating'>('alpha')
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.split('?')[1] || '')
+    // Try to get location silently
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setSortMode('nearby')
+      },
+      () => setSortMode('alpha'), // denied → alphabetical, no error
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+
+    const params = new URLSearchParams(window.location.search || '')
     const q = params.get('q') || ''
     if (q) setSearch(q)
     fetchCoaches(q)
@@ -20,10 +40,9 @@ export default function Coaches() {
     setLoading(true)
     let q = supabase
       .from('coaches')
-      .select('*, club:clubs(id, name, logo_url)')
+      .select('*, club:clubs(id, name, logo_url, lat, lng)')
       .eq('status', 'approved')
-      .order('avg_overall', { ascending: false })
-      .limit(50)
+      .limit(100)
 
     if (query && query.trim()) {
       q = q.or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
@@ -33,6 +52,20 @@ export default function Coaches() {
     setCoaches((data as Coach[]) || [])
     setLoading(false)
   }
+
+  // Sort coaches based on current mode + location
+  const sorted = [...coaches].sort((a, b) => {
+    if (sortMode === 'nearby' && coords) {
+      const clubA = a.club as any
+      const clubB = b.club as any
+      const distA = clubA?.lat ? haversine(coords.lat, coords.lng, clubA.lat, clubA.lng) : 9999
+      const distB = clubB?.lat ? haversine(coords.lat, coords.lng, clubB.lat, clubB.lng) : 9999
+      return distA - distB
+    }
+    if (sortMode === 'rating') return b.avg_overall - a.avg_overall
+    // alpha by last name
+    return a.last_name.localeCompare(b.last_name)
+  })
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -50,7 +83,7 @@ export default function Coaches() {
           </div>
         </div>
 
-        <form onSubmit={handleSearch} className="flex gap-3 mb-8 max-w-lg">
+        <form onSubmit={handleSearch} className="flex gap-3 mb-4 max-w-lg">
           <input
             type="search"
             value={search}
@@ -70,13 +103,29 @@ export default function Coaches() {
           </button>
         </form>
 
+        {/* Sort toggle */}
+        <div className="flex gap-1.5 mb-6">
+          {([
+            { v: 'alpha' as const, l: 'A–Z' },
+            { v: 'rating' as const, l: 'Top Rated' },
+            ...(coords ? [{ v: 'nearby' as const, l: 'Nearest' }] : []),
+          ]).map(s => (
+            <button key={s.v} onClick={() => setSortMode(s.v)}
+              className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
+              style={sortMode === s.v
+                ? { background: 'var(--fg-text)', color: 'white', borderColor: 'var(--fg-text)' }
+                : { background: 'var(--fg-surface)', color: 'var(--fg-muted)', borderColor: 'var(--fg-border)' }}
+              data-testid={`sort-${s.v}`}>{s.l}</button>
+          ))}
+        </div>
+
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1,2,3,4,5,6].map(i => (
               <div key={i} className="bg-white rounded-2xl p-5 animate-pulse border" style={{ borderColor: 'var(--fg-border)', height: 200 }} />
             ))}
           </div>
-        ) : coaches.length === 0 ? (
+        ) : sorted.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-3">⚽</div>
             <div className="font-semibold" style={{ color: 'var(--fg-text2)' }}>No coaches found</div>
@@ -84,7 +133,7 @@ export default function Coaches() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {coaches.map(c => <CoachCard key={c.id} coach={c} />)}
+            {sorted.map(c => <CoachCard key={c.id} coach={c} />)}
           </div>
         )}
       </div>
