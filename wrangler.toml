@@ -1,0 +1,5 @@
+name = "futbol-grade"
+compatibility_date = "2026-04-09"
+
+[assets]
+directory = "dist/public"
