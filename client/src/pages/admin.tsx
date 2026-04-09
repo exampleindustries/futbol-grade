@@ -61,7 +61,19 @@ function AdminLoginForm() {
   )
 }
 
-type Tab = 'reviews' | 'listings' | 'claims' | 'imports'
+type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users'
+
+interface AdminUser {
+  id: string
+  alias: string
+  alias_emoji: string
+  email: string | null
+  is_admin: boolean
+  is_banned: boolean
+  review_count: number
+  listing_count: number
+  created_at: string
+}
 type ReviewFilter = 'pending' | 'approved' | 'rejected'
 type ListingFilter = 'pending' | 'active' | 'removed'
 type ClaimFilter = 'pending' | 'approved' | 'rejected'
@@ -90,6 +102,8 @@ export default function Admin() {
   const [claims, setClaims] = useState<CoachClaim[]>([])
   const [imports, setImports] = useState<(Coach & { club?: { id: string; name: string; city: string } })[]>([])
   const [selectedImports, setSelectedImports] = useState<Set<string>>(new Set())
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [userSearch, setUserSearch] = useState('')
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -147,11 +161,23 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchUsers = useCallback(async (search?: string) => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const q = search ? `?search=${encodeURIComponent(search)}` : ''
+      const res = await fetch(`${getApiBase()}/api/admin/users${q}`, { headers: { Authorization: auth } })
+      if (res.ok) setUsers(await res.json())
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   useEffect(() => { if (profile?.is_admin) fetchStats() }, [profile, fetchStats])
   useEffect(() => { if (profile?.is_admin && tab === 'reviews') fetchReviews(reviewFilter) }, [profile, tab, reviewFilter, fetchReviews])
   useEffect(() => { if (profile?.is_admin && tab === 'listings') fetchListings(listingFilter) }, [profile, tab, listingFilter, fetchListings])
   useEffect(() => { if (profile?.is_admin && tab === 'claims') fetchClaims(claimFilter) }, [profile, tab, claimFilter, fetchClaims])
   useEffect(() => { if (profile?.is_admin && tab === 'imports') fetchImports(importFilter) }, [profile, tab, importFilter, fetchImports])
+  useEffect(() => { if (profile?.is_admin && tab === 'users') fetchUsers() }, [profile, tab, fetchUsers])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
     setActionLoading(id)
@@ -185,6 +211,19 @@ export default function Admin() {
       }
       await fetchImports(importFilter)
       await fetchStats()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  async function handleUserAction(userId: string, field: 'is_admin' | 'is_banned', value: boolean) {
+    setActionLoading(userId)
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/users/${userId}`, {
+        method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      await fetchUsers(userSearch || undefined)
     } catch { /* ignore */ }
     setActionLoading(null)
   }
@@ -319,13 +358,14 @@ export default function Admin() {
             <StatCard label="Active Listings" value={stats.listings.active} />
             <StatCard label="Pending Claims" value={stats.claims.pending} accent />
             <StatCard label="Pending Imports" value={stats.imports.pending} accent />
+            <StatCard label="Total Users" value={users.length || 0} />
           </div>
         )}
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings', 'claims', 'imports'] as Tab[]).map(t => {
-            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : stats.imports.pending) : 0
+          {(['reviews', 'listings', 'claims', 'imports', 'users'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : users.length) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
                 className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
@@ -552,6 +592,98 @@ export default function Admin() {
             )}
           </>
         )}
+        {/* Users tab */}
+        {tab === 'users' && (
+          <>
+            <form onSubmit={e => { e.preventDefault(); fetchUsers(userSearch || undefined) }} className="flex gap-3 mb-6">
+              <input type="search" value={userSearch} onChange={e => setUserSearch(e.target.value)}
+                placeholder="Search by alias..."
+                className="flex-1 border rounded-lg px-4 py-2.5 text-sm outline-none max-w-xs"
+                style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }}
+                data-testid="user-search" />
+              <button type="submit" className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all hover:bg-gray-50"
+                style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }}>Search</button>
+            </form>
+
+            {loading ? <Skeleton /> : users.length === 0 ? (
+              <EmptyState text="No users found" />
+            ) : (
+              <div className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }}>
+                {/* Table header */}
+                <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-5 py-3 border-b font-mono text-[10px] font-bold tracking-widest uppercase"
+                  style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)', background: 'var(--fg-surface)' }}>
+                  <div className="col-span-3">User</div>
+                  <div className="col-span-3">Email</div>
+                  <div className="col-span-1 text-center">Reviews</div>
+                  <div className="col-span-1 text-center">Listings</div>
+                  <div className="col-span-1 text-center">Role</div>
+                  <div className="col-span-3 text-right">Actions</div>
+                </div>
+
+                <div className="divide-y" style={{ borderColor: 'var(--fg-border)' }}>
+                  {users.map(u => (
+                    <div key={u.id} className="sm:grid sm:grid-cols-12 gap-2 items-center px-4 sm:px-5 py-3" data-testid={`user-${u.id}`}>
+                      {/* User */}
+                      <div className="col-span-3 flex items-center gap-2 min-w-0 mb-2 sm:mb-0">
+                        <span className="text-sm">{u.alias_emoji || '⚽'}</span>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm truncate" style={{ color: u.is_banned ? 'var(--fg-red)' : 'var(--fg-text)' }}>
+                            {u.alias || 'Anonymous'}
+                            {u.is_banned && <span className="font-mono text-[9px] ml-1 px-1 py-0.5 rounded" style={{ background: 'var(--fg-red-pale)', color: 'var(--fg-red)' }}>BANNED</span>}
+                          </div>
+                          <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{timeAgo(u.created_at)}</div>
+                        </div>
+                      </div>
+
+                      {/* Email */}
+                      <div className="col-span-3 font-mono text-[11px] truncate mb-2 sm:mb-0" style={{ color: 'var(--fg-text2)' }}>
+                        {u.email || '—'}
+                      </div>
+
+                      {/* Reviews */}
+                      <div className="col-span-1 text-center font-mono text-xs font-bold" style={{ color: u.review_count ? 'var(--fg-green)' : 'var(--fg-muted)' }}>
+                        {u.review_count}
+                      </div>
+
+                      {/* Listings */}
+                      <div className="col-span-1 text-center font-mono text-xs font-bold" style={{ color: u.listing_count ? 'var(--fg-green)' : 'var(--fg-muted)' }}>
+                        {u.listing_count}
+                      </div>
+
+                      {/* Role */}
+                      <div className="col-span-1 text-center">
+                        {u.is_admin ? (
+                          <span className="font-mono text-[9px] font-bold px-2 py-0.5 rounded" style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)' }}>ADMIN</span>
+                        ) : (
+                          <span className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>user</span>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="col-span-3 flex gap-2 justify-end mt-2 sm:mt-0">
+                        {u.is_admin ? (
+                          <ActionBtn label="Demote" color="amber" loading={actionLoading === u.id}
+                            onClick={() => handleUserAction(u.id, 'is_admin', false)} />
+                        ) : (
+                          <ActionBtn label="Promote" color="green" loading={actionLoading === u.id}
+                            onClick={() => handleUserAction(u.id, 'is_admin', true)} />
+                        )}
+                        {u.is_banned ? (
+                          <ActionBtn label="Unban" color="green" loading={actionLoading === u.id}
+                            onClick={() => handleUserAction(u.id, 'is_banned', false)} />
+                        ) : (
+                          <ActionBtn label="Ban" color="red" loading={actionLoading === u.id}
+                            onClick={() => handleUserAction(u.id, 'is_banned', true)} />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Imports tab */}
         {tab === 'imports' && (
           <>
