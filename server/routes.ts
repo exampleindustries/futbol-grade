@@ -767,12 +767,26 @@ export async function registerRoutes(
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
-      const { data, error } = await supabase
+      const { data: clubs, error } = await supabase
         .from("clubs")
-        .select("id, name, city, state, region, logo_url, status, coach_count, avg_overall")
+        .select("id, name, abbr, city, state, region, logo_url, website, contact_email, status, coach_count, avg_overall")
         .order("name");
       if (error) return res.status(400).json({ error: error.message });
-      return res.json(data);
+
+      // Fetch coaches grouped by club for the associated coaches list
+      const { data: coaches } = await supabase
+        .from("coaches")
+        .select("id, first_name, last_name, club_id, status")
+        .order("last_name");
+      const coachMap = new Map<string, any[]>();
+      (coaches || []).forEach((c: any) => {
+        if (!c.club_id) return;
+        if (!coachMap.has(c.club_id)) coachMap.set(c.club_id, []);
+        coachMap.get(c.club_id)!.push(c);
+      });
+
+      const result = (clubs || []).map((c: any) => ({ ...c, coaches: coachMap.get(c.id) || [] }));
+      return res.json(result);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -780,7 +794,7 @@ export async function registerRoutes(
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
-      const allowed = ["name", "city", "state", "logo_url", "status"];
+      const allowed = ["name", "abbr", "city", "state", "logo_url", "status", "website", "contact_email", "region"];
       const updates: Record<string, any> = {};
       for (const k of allowed) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
       if (!Object.keys(updates).length) return res.status(400).json({ error: "No valid fields" });

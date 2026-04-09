@@ -66,12 +66,16 @@ type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | '
 interface AdminClub {
   id: string
   name: string
+  abbr: string | null
   city: string
   state: string
   logo_url: string | null
+  website: string | null
+  contact_email: string | null
   status: string
   coach_count: number
   avg_overall: number
+  coaches: { id: string; first_name: string; last_name: string; status: string }[]
 }
 
 interface AdminUser {
@@ -119,9 +123,7 @@ export default function Admin() {
   const [adminClubs, setAdminClubs] = useState<AdminClub[]>([])
   const [uploadingLogo, setUploadingLogo] = useState<string | null>(null)
   const [editingClub, setEditingClub] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editCity, setEditCity] = useState('')
-  const [editState, setEditState] = useState('')
+  const [clubEdits, setClubEdits] = useState<Record<string, any>>({})
   const [allCoaches, setAllCoaches] = useState<(Coach & { club?: { id: string; name: string; city: string } | null })[]>([])
   const [coachSearch, setCoachSearch] = useState('')
   const [editingCoach, setEditingCoach] = useState<string | null>(null)
@@ -741,97 +743,141 @@ export default function Admin() {
             ) : (
               <div className="space-y-3">
                 {adminClubs.map(c => (
-                  <div key={c.id} className="bg-white border rounded-xl p-4 sm:p-5 flex items-center gap-4" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-club-${c.id}`}>
-                    {/* Logo */}
-                    <div className="flex-shrink-0">
-                      {c.logo_url ? (
-                        <img src={c.logo_url} alt={c.name} className="w-14 h-14 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
-                      ) : (
-                        <div className="w-14 h-14 rounded-xl flex items-center justify-center border-2 border-dashed" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-muted)' }}>
-                          <span className="text-[10px] font-mono">No logo</span>
+                  <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-club-${c.id}`}>
+                    {editingClub === c.id ? (
+                      /* ── Edit mode ── */
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-center gap-3 mb-1">
+                          {c.logo_url ? (
+                            <img src={c.logo_url} alt={c.name} className="w-12 h-12 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-dashed" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-muted)' }}>
+                              <span className="text-[9px] font-mono">Logo</span>
+                            </div>
+                          )}
+                          <label className="cursor-pointer">
+                            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                              onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(c.id, c.name, f); e.target.value = '' }} />
+                            <span className="font-mono text-[10px] font-bold px-3 py-1.5 rounded-lg border inline-block"
+                              style={{ borderColor: 'var(--fg-border2)', color: uploadingLogo === c.id ? 'var(--fg-muted)' : 'var(--fg-green)' }}>
+                              {uploadingLogo === c.id ? 'Uploading...' : c.logo_url ? 'Replace Logo' : 'Upload Logo'}
+                            </span>
+                          </label>
                         </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      {editingClub === c.id ? (
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="font-mono text-[9px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Name</label>
-                            <input value={editName} onChange={e => setEditName(e.target.value)}
-                              className="w-full border rounded-lg px-3 py-1.5 text-sm outline-none mt-0.5"
-                              style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }} />
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Club Name</label>
+                            <input value={clubEdits.name || ''} onChange={e => setClubEdits(p => ({ ...p, name: e.target.value }))}
+                              className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
                           </div>
-                          <div className="flex gap-2">
-                            <div className="flex-1">
-                              <label className="font-mono text-[9px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>City</label>
-                              <input value={editCity} onChange={e => setEditCity(e.target.value)}
-                                className="w-full border rounded-lg px-3 py-1.5 text-sm outline-none mt-0.5"
-                                style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }} />
-                            </div>
-                            <div className="w-20">
-                              <label className="font-mono text-[9px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>State</label>
-                              <input value={editState} onChange={e => setEditState(e.target.value)}
-                                className="w-full border rounded-lg px-3 py-1.5 text-sm outline-none mt-0.5"
-                                style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }} />
-                            </div>
-                          </div>
-                          <div className="flex gap-2 pt-1">
-                            <button onClick={async () => {
-                              const auth = await getAuthHeader()
-                              await fetch(`${getApiBase()}/api/admin/clubs/${c.id}`, {
-                                method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ name: editName, city: editCity, state: editState }),
-                              })
-                              setEditingClub(null)
-                              await fetchClubs()
-                            }} className="font-mono text-[10px] font-bold px-3 py-1 rounded-lg text-white" style={{ background: 'var(--fg-green)' }}>Save</button>
-                            <button onClick={() => setEditingClub(null)} className="font-mono text-[10px] font-bold px-3 py-1 rounded-lg border" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }}>Cancel</button>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Division / Abbr</label>
+                            <input value={clubEdits.abbr || ''} onChange={e => setClubEdits(p => ({ ...p, abbr: e.target.value }))}
+                              placeholder="e.g. ECNL, CalSouth" className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
                           </div>
                         </div>
-                      ) : (
-                        <>
-                          <div className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{c.name}</div>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
-                              {c.city}, {c.state}
-                            </span>
-                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>
-                              {c.coach_count} coach{c.coach_count !== 1 ? 'es' : ''}
-                            </span>
-                            {c.avg_overall > 0 && (
-                              <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-green)' }}>
-                                ★ {c.avg_overall.toFixed(1)}
-                              </span>
-                            )}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>City</label>
+                            <input value={clubEdits.city || ''} onChange={e => setClubEdits(p => ({ ...p, city: e.target.value }))}
+                              className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
                           </div>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-2 flex-shrink-0 items-end">
-                      <label className="cursor-pointer">
-                        <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-                          onChange={e => {
-                            const file = e.target.files?.[0]
-                            if (file) handleLogoUpload(c.id, c.name, file)
-                            e.target.value = ''
-                          }} />
-                        <span className="font-mono text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all hover:bg-gray-50 inline-block"
-                          style={{ borderColor: 'var(--fg-border2)', color: uploadingLogo === c.id ? 'var(--fg-muted)' : 'var(--fg-green)' }}>
-                          {uploadingLogo === c.id ? 'Uploading...' : c.logo_url ? 'Replace Logo' : 'Upload Logo'}
-                        </span>
-                      </label>
-                      {editingClub !== c.id && (
-                        <button onClick={() => { setEditingClub(c.id); setEditName(c.name); setEditCity(c.city); setEditState(c.state) }}
-                          className="font-mono text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all hover:bg-gray-50"
-                          style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }}>
-                          Edit
-                        </button>
-                      )}
-                    </div>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>State</label>
+                            <input value={clubEdits.state || ''} onChange={e => setClubEdits(p => ({ ...p, state: e.target.value }))}
+                              className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                          </div>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Status</label>
+                            <select value={clubEdits.status || 'approved'} onChange={e => setClubEdits(p => ({ ...p, status: e.target.value }))}
+                              className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }}>
+                              <option value="approved">Approved</option>
+                              <option value="pending">Pending</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Contact Email</label>
+                            <input type="email" value={clubEdits.contact_email || ''} onChange={e => setClubEdits(p => ({ ...p, contact_email: e.target.value }))}
+                              placeholder="club@example.com" className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                          </div>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Website</label>
+                            <input value={clubEdits.website || ''} onChange={e => setClubEdits(p => ({ ...p, website: e.target.value }))}
+                              placeholder="https://..." className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                          </div>
+                        </div>
+                        {/* Associated coaches */}
+                        <div>
+                          <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1.5" style={{ color: 'var(--fg-muted)' }}>Associated Coaches ({c.coaches.length})</label>
+                          {c.coaches.length === 0 ? (
+                            <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>No coaches assigned</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {c.coaches.map(coach => (
+                                <a key={coach.id} href={`/coaches/${coach.id}`} target="_blank" rel="noopener noreferrer"
+                                  className="font-mono text-[10px] px-2.5 py-1 rounded-lg border hover:shadow-sm transition-all inline-flex items-center gap-1"
+                                  style={{ borderColor: 'var(--fg-border)', color: coach.status === 'approved' ? 'var(--fg-text2)' : 'var(--fg-muted)' }}>
+                                  {coach.first_name} {coach.last_name}
+                                  {coach.status !== 'approved' && <span className="text-[8px] uppercase opacity-60">({coach.status})</span>}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={async () => {
+                            setActionLoading(c.id)
+                            const auth = await getAuthHeader()
+                            await fetch(`${getApiBase()}/api/admin/clubs/${c.id}`, {
+                              method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+                              body: JSON.stringify(clubEdits),
+                            })
+                            setEditingClub(null); setClubEdits({})
+                            await fetchClubs()
+                            setActionLoading(null)
+                          }} className="font-mono text-[10px] font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: 'var(--fg-green)' }}>
+                            {actionLoading === c.id ? '...' : 'Save'}
+                          </button>
+                          <button onClick={() => { setEditingClub(null); setClubEdits({}) }}
+                            className="font-mono text-[10px] font-bold px-3 py-1.5 rounded-lg border" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── View mode ── */
+                      <div className="flex items-center gap-4 p-4 sm:p-5">
+                        <div className="flex-shrink-0">
+                          {c.logo_url ? (
+                            <img src={c.logo_url} alt={c.name} className="w-14 h-14 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
+                          ) : (
+                            <div className="w-14 h-14 rounded-xl flex items-center justify-center border-2 border-dashed" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-muted)' }}>
+                              <span className="text-[10px] font-mono">No logo</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{c.name}</span>
+                            {c.abbr && <span className="font-mono text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'var(--fg-surface)', color: 'var(--fg-muted)' }}>{c.abbr}</span>}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>{c.city}, {c.state}</span>
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.coaches.length} coaches</span>
+                            {c.avg_overall > 0 && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-green)' }}>★ {c.avg_overall.toFixed(1)}</span>}
+                            {c.contact_email && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.contact_email}</span>}
+                            {c.website && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>🌐</span>}
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          setEditingClub(c.id)
+                          setClubEdits({ name: c.name, abbr: c.abbr || '', city: c.city, state: c.state, status: c.status, contact_email: c.contact_email || '', website: c.website || '' })
+                        }}
+                          className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all flex-shrink-0"
+                          style={{ background: 'var(--fg-surface)', color: 'var(--fg-green)', borderColor: 'var(--fg-green)' }}>Edit</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
