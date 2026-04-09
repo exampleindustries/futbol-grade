@@ -7,6 +7,7 @@ import { Nav } from '@/components/layout/Nav'
 import { RatingBadge } from '@/components/ui/RatingBadge'
 import { KpiBar } from '@/components/ui/KpiBar'
 import { CoachCard } from '@/components/coaches/CoachCard'
+import { useHead } from '@/hooks/use-head'
 
 export default function ClubDetail() {
   const [, params] = useRoute('/clubs/:id')
@@ -28,6 +29,12 @@ export default function ClubDetail() {
     }
     load()
   }, [id])
+
+  useHead(club ? {
+    title: `${club.name} - Club Rating ${club.avg_overall.toFixed(1)}/5 | Futbol Grade`,
+    description: `${club.name} rated ${club.avg_overall.toFixed(1)}/5. ${club.coach_count} coach${club.coach_count !== 1 ? 'es' : ''}, ${club.total_reviews} review${club.total_reviews !== 1 ? 's' : ''}. ${club.city || 'SoCal'} youth soccer club.`,
+    url: `https://futbolgrade.com/#/clubs/${id}`,
+  } : {})
 
   if (loading) return (
     <div style={{ background: 'var(--fg-bg)', minHeight: '100vh' }}>

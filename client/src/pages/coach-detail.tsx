@@ -8,6 +8,7 @@ import { RatingBadge } from '@/components/ui/RatingBadge'
 import { KpiBar } from '@/components/ui/KpiBar'
 import { fullName, initials, timeAgo } from '@/lib/fg-utils'
 import { useAuth } from '@/hooks/use-auth'
+import { useHead } from '@/hooks/use-head'
 
 export default function CoachDetail() {
   const [, params] = useRoute('/coaches/:id')
@@ -30,6 +31,12 @@ export default function CoachDetail() {
     }
     load()
   }, [id])
+
+  useHead(coach ? {
+    title: `${coach.first_name} ${coach.last_name} - Coach Rating ${coach.avg_overall.toFixed(1)}/5 | Futbol Grade`,
+    description: `${coach.first_name} ${coach.last_name} rated ${coach.avg_overall.toFixed(1)}/5 by the community. ${coach.total_reviews} review${coach.total_reviews !== 1 ? 's' : ''}. ${coach.city || 'SoCal'} youth soccer coach.`,
+    url: `https://futbolgrade.com/#/coaches/${id}`,
+  } : {})
 
   if (loading) return (
     <div style={{ background: 'var(--fg-bg)', minHeight: '100vh' }}>
