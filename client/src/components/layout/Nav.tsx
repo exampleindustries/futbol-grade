@@ -52,6 +52,11 @@ export function Nav() {
                   <a href="#/profile" className="block px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors" style={{ color: 'var(--fg-text)' }} data-testid="menu-profile">
                     My Profile
                   </a>
+                  {profile?.is_admin && (
+                    <a href="#/admin" className="block px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors font-semibold" style={{ color: 'var(--fg-green)' }} data-testid="menu-admin">
+                      Admin
+                    </a>
+                  )}
                   <div className="border-t" style={{ borderColor: 'var(--fg-border)' }} />
                   <button
                     onClick={() => { signOut(); setMenuOpen(false); }}

@@ -14,6 +14,7 @@ import Marketplace from "@/pages/marketplace";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Profile from "@/pages/profile";
+import Admin from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -29,6 +30,7 @@ function AppRouter() {
       <Route path="/auth/login" component={Login} />
       <Route path="/auth/register" component={Register} />
       <Route path="/profile" component={Profile} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -172,5 +172,132 @@ export async function registerRoutes(
     }
   });
 
+  // ── Admin helpers ────────────────────────────────────────────
+
+  async function requireAdmin(req: any, res: any): Promise<ReturnType<typeof getSupabaseClient> | null> {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) { res.status(401).json({ error: "Not authenticated" }); return null; }
+    const supabase = getSupabaseClient(authHeader);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { res.status(401).json({ error: "Not authenticated" }); return null; }
+    const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single();
+    if (!profile?.is_admin) { res.status(403).json({ error: "Forbidden" }); return null; }
+    return supabase;
+  }
+
+  // ── Admin: Reviews ───────────────────────────────────────────
+
+  app.get("/api/admin/reviews", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const status = (req.query.status as string) || "pending";
+      const { data, error } = await supabase
+        .from("reviews")
+        .select("*, coach:coaches(id, first_name, last_name), reviewer:profiles(alias, alias_emoji)")
+        .eq("status", status)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.patch("/api/admin/reviews/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { status } = req.body;
+      if (!status || !["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
+      }
+      const { data, error } = await supabase
+        .from("reviews")
+        .update({ status, reviewed_at: new Date().toISOString() })
+        .eq("id", req.params.id)
+        .select()
+        .single();
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.delete("/api/admin/reviews/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { error } = await supabase.from("reviews").delete().eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // ── Admin: Listings ──────────────────────────────────────────
+
+  app.get("/api/admin/listings", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const status = (req.query.status as string) || "pending";
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*, seller:profiles(alias, alias_emoji)")
+        .eq("status", status)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.patch("/api/admin/listings/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { status } = req.body;
+      if (!status || !["active", "removed"].includes(status)) {
+        return res.status(400).json({ error: "status must be 'active' or 'removed'" });
+      }
+      const { data, error } = await supabase
+        .from("listings")
+        .update({ status, approved_at: new Date().toISOString() })
+        .eq("id", req.params.id)
+        .select()
+        .single();
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.delete("/api/admin/listings/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { error } = await supabase.from("listings").delete().eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // ── Admin: Stats ─────────────────────────────────────────────
+
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const [pr, ar, rr, pl, al] = await Promise.all([
+        supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "approved"),
+        supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "rejected"),
+        supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "active"),
+      ]);
+      return res.json({
+        reviews: { pending: pr.count || 0, approved: ar.count || 0, rejected: rr.count || 0 },
+        listings: { pending: pl.count || 0, active: al.count || 0 },
+      });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   return httpServer;
 }

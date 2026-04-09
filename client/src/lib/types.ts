@@ -14,6 +14,7 @@ export interface Profile {
   avatar_url: string | null
   prefer_anonymous: boolean
   role: string
+  is_admin: boolean
   created_at: string
   updated_at: string
 }
