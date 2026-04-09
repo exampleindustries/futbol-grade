@@ -86,6 +86,78 @@ function buildAlertHtml(type: "review" | "listing", details: Record<string, stri
 </body></html>`;
 }
 
+function buildCoachAlertHtml(coachName: string, scores: Record<string, number>, coachId: string) {
+  const avg = Object.values(scores).reduce((a, b) => a + b, 0) / Object.values(scores).length;
+  const scoreRows = Object.entries(scores)
+    .map(
+      ([label, val]) => `
+      <tr>
+        <td style="padding:6px 12px;color:#374151;">${label}</td>
+        <td style="padding:6px 12px;font-weight:600;color:#1a3c24;text-align:right;">${val.toFixed(1)} / 5.0</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;"><tr><td align="center">
+    <table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+      <tr><td style="background:#1a3c24;padding:20px 24px;">
+        <span style="color:#4ade80;font-size:20px;font-weight:700;">&#9917; Futbol Grade</span>
+      </td></tr>
+      <tr><td style="padding:24px;">
+        <h2 style="margin:0 0 8px;color:#1a3c24;font-size:18px;">New Review Received</h2>
+        <p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.5;">Hi ${coachName}, someone just submitted a review of your coaching. It&#8217;s currently pending moderation&#8202;&#8212;&#8202;once approved it will appear on your profile.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:8px;">
+          ${scoreRows}
+          <tr><td colspan="2" style="border-top:1px solid #e5e7eb;"></td></tr>
+          <tr>
+            <td style="padding:8px 12px;font-weight:700;color:#1a3c24;">Overall</td>
+            <td style="padding:8px 12px;font-weight:700;color:#16a34a;text-align:right;font-size:16px;">${avg.toFixed(1)} / 5.0</td>
+          </tr>
+        </table>
+        <p style="margin:16px 0 20px;color:#9ca3af;font-size:12px;">Reviewer details are kept confidential.</p>
+        <a href="https://exampleindustries.github.io/futbol-grade/#/coaches/${coachId}"
+           style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">
+          View Your Profile &#8594;
+        </a>
+      </td></tr>
+      <tr><td style="padding:16px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+        <span style="color:#9ca3af;font-size:12px;">Automated alert from Futbol Grade</span>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+}
+
+async function sendCoachAlert(
+  coachEmail: string,
+  coachName: string,
+  scores: Record<string, number>,
+  coachId: string,
+) {
+  if (!RESEND_API_KEY || !coachEmail) return;
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Futbol Grade <onboarding@resend.dev>",
+        to: [coachEmail],
+        subject: "You received a new review on Futbol Grade",
+        html: buildCoachAlertHtml(coachName, scores, coachId),
+      }),
+    });
+    if (!resp.ok) console.error("Coach email alert error:", await resp.text());
+  } catch (err) {
+    console.error("Coach email alert failed:", err);
+  }
+}
+
 async function sendAdminAlert(type: "review" | "listing", details: Record<string, string>) {
   if (!RESEND_API_KEY) return;
   const subject = type === "review"
@@ -178,14 +250,19 @@ export async function registerRoutes(
         return res.status(400).json({ error: error.message });
       }
 
-      // Fire-and-forget admin email alert
-      const avgScore = (
-        body.score_technical + body.score_team_building + body.score_development +
-        body.score_approachability + body.score_professionalism + body.score_dedication
-      ) / 6;
+      // Fire-and-forget email alerts (admin + coach)
+      const scores = {
+        Technical: body.score_technical,
+        "Team Building": body.score_team_building,
+        Development: body.score_development,
+        Approachability: body.score_approachability,
+        Professionalism: body.score_professionalism,
+        Dedication: body.score_dedication,
+      };
+      const avgScore = Object.values(scores).reduce((a, b) => a + b, 0) / 6;
       supabase
         .from("coaches")
-        .select("first_name, last_name")
+        .select("first_name, last_name, email")
         .eq("id", body.coach_id)
         .single()
         .then(({ data: coach }) => {
@@ -195,6 +272,9 @@ export async function registerRoutes(
             "Avg Score": `${avgScore.toFixed(1)} / 5.0`,
             Excerpt: (body.body || "No written review").substring(0, 120),
           });
+          if (coach?.email) {
+            sendCoachAlert(coach.email, coach.first_name, scores, body.coach_id);
+          }
         })
         .catch(() => {});
 
