@@ -519,12 +519,13 @@ export async function registerRoutes(
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
       const status = (req.query.status as string) || "pending";
-      const { data, error } = await supabase
+      let query = supabase
         .from("reviews")
         .select("*, coach:coaches(id, first_name, last_name), reviewer:profiles(alias, alias_emoji)")
-        .eq("status", status)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
+      if (status !== "all") query = query.eq("status", status);
+      const { data, error } = await query;
       if (error) return res.status(400).json({ error: error.message });
       return res.json(data);
     } catch { return res.status(500).json({ error: "Server error" }); }
@@ -567,12 +568,13 @@ export async function registerRoutes(
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
       const status = (req.query.status as string) || "pending";
-      const { data, error } = await supabase
+      let query = supabase
         .from("listings")
         .select("*, seller:profiles(alias, alias_emoji)")
-        .eq("status", status)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
+      if (status !== "all") query = query.eq("status", status);
+      const { data, error } = await query;
       if (error) return res.status(400).json({ error: error.message });
       return res.json(data);
     } catch { return res.status(500).json({ error: "Server error" }); }

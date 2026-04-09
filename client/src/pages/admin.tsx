@@ -155,21 +155,21 @@ export default function Admin() {
     } catch { /* ignore */ }
   }, [])
 
-  const fetchReviews = useCallback(async (status: ReviewFilter) => {
+  const fetchReviews = useCallback(async () => {
     setLoading(true)
     try {
       const auth = await getAuthHeader()
-      const res = await fetch(`${getApiBase()}/api/admin/reviews?status=${status}`, { headers: { Authorization: auth } })
+      const res = await fetch(`${getApiBase()}/api/admin/reviews?status=all`, { headers: { Authorization: auth } })
       if (res.ok) setReviews(await res.json())
     } catch { /* ignore */ }
     setLoading(false)
   }, [])
 
-  const fetchListings = useCallback(async (status: ListingFilter) => {
+  const fetchListings = useCallback(async () => {
     setLoading(true)
     try {
       const auth = await getAuthHeader()
-      const res = await fetch(`${getApiBase()}/api/admin/listings?status=${status}`, { headers: { Authorization: auth } })
+      const res = await fetch(`${getApiBase()}/api/admin/listings?status=all`, { headers: { Authorization: auth } })
       if (res.ok) setListings(await res.json())
     } catch { /* ignore */ }
     setLoading(false)
@@ -248,8 +248,8 @@ export default function Admin() {
   }, [])
 
   useEffect(() => { if (profile?.is_admin) fetchStats() }, [profile, fetchStats])
-  useEffect(() => { if (profile?.is_admin && tab === 'reviews') fetchReviews(reviewFilter) }, [profile, tab, reviewFilter, fetchReviews])
-  useEffect(() => { if (profile?.is_admin && tab === 'listings') fetchListings(listingFilter) }, [profile, tab, listingFilter, fetchListings])
+  useEffect(() => { if (profile?.is_admin && tab === 'reviews') fetchReviews() }, [profile, tab, fetchReviews])
+  useEffect(() => { if (profile?.is_admin && tab === 'listings') fetchListings() }, [profile, tab, fetchListings])
   useEffect(() => { if (profile?.is_admin && tab === 'claims') fetchClaims(claimFilter) }, [profile, tab, claimFilter, fetchClaims])
   useEffect(() => { if (profile?.is_admin && tab === 'imports') fetchImports(importFilter) }, [profile, tab, importFilter, fetchImports])
   useEffect(() => { if (profile?.is_admin && tab === 'users') fetchUsers() }, [profile, tab, fetchUsers])
@@ -270,7 +270,7 @@ export default function Admin() {
           body: JSON.stringify({ status: action }),
         })
       }
-      await fetchReviews(reviewFilter)
+      await fetchReviews()
       await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
@@ -353,7 +353,7 @@ export default function Admin() {
       })
       setEditingListing(null)
       setListingEdits({})
-      await fetchListings(listingFilter)
+      await fetchListings()
       await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
@@ -419,7 +419,7 @@ export default function Admin() {
         body: JSON.stringify({ ids: Array.from(selectedListings), status }),
       })
       setSelectedListings(new Set())
-      await fetchListings(listingFilter)
+      await fetchListings()
       await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
@@ -535,7 +535,7 @@ export default function Admin() {
           body: JSON.stringify({ status: action }),
         })
       }
-      await fetchListings(listingFilter)
+      await fetchListings()
       await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
@@ -627,118 +627,132 @@ export default function Admin() {
         {/* Reviews tab */}
         {tab === 'reviews' && (
           <>
-            <FilterBar<ReviewFilter>
-              options={[
-                { value: 'pending', label: 'Pending' },
-                { value: 'approved', label: 'Approved' },
-                { value: 'rejected', label: 'Rejected' },
-              ]}
-              value={reviewFilter}
-              onChange={setReviewFilter}
-            />
-            {loading ? <Skeleton /> : reviews.length === 0 ? (
-              <EmptyState text={`No ${reviewFilter} reviews`} />
-            ) : (
-              <div className="space-y-3">
-                {reviews.map(r => (
-                  <div key={r.id} className="bg-white border rounded-xl p-4 sm:p-5" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-review-${r.id}`}>
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="text-sm">{r.reviewer?.alias_emoji || '⚽'}</span>
-                          <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>
-                            {r.is_anonymous ? r.reviewer?.alias || 'Anonymous' : 'Named reviewer'}
-                          </span>
-                          <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>→</span>
-                          <a href={`/coaches/${r.coach_id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
-                            {r.coach ? `${r.coach.first_name} ${r.coach.last_name}` : r.coach_id.slice(0, 8)}
-                          </a>
-                        </div>
-                        <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>
-                          {timeAgo(r.created_at)} · {r.player_position || 'No position'}
-                        </div>
-                      </div>
-                      <RatingBadge score={avgScore(r)} size="sm" />
-                    </div>
-
-                    {/* Scores compact */}
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {[
-                        ['Tech', r.score_technical], ['Team', r.score_team_building], ['Dev', r.score_development],
-                        ['Appch', r.score_approachability], ['Prof', r.score_professionalism], ['Ded', r.score_dedication],
-                      ].map(([l, v]) => (
-                        <span key={l as string} className="font-mono text-[10px] px-2 py-0.5 rounded border"
-                          style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
-                          {l}: {(v as number).toFixed(1)}
+            {loading ? <Skeleton /> : (() => {
+              const pending = reviews.filter(r => r.status === 'pending')
+              const approved = reviews.filter(r => r.status === 'approved')
+              const renderReview = (r: typeof reviews[0], showApprove: boolean, showReject: boolean) => (
+                <div key={r.id} className="bg-white border rounded-xl p-4 sm:p-5" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-review-${r.id}`}>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-sm">{r.reviewer?.alias_emoji || '⚽'}</span>
+                        <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>
+                          {r.is_anonymous ? r.reviewer?.alias || 'Anonymous' : 'Named reviewer'}
                         </span>
+                        <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>→</span>
+                        <a href={`/coaches/${r.coach_id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
+                          {r.coach ? `${r.coach.first_name} ${r.coach.last_name}` : r.coach_id.slice(0, 8)}
+                        </a>
+                      </div>
+                      <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>
+                        {timeAgo(r.created_at)} · {r.player_position || 'No position'}
+                      </div>
+                    </div>
+                    <RatingBadge score={avgScore(r)} size="sm" />
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[
+                      ['Tech', r.score_technical], ['Team', r.score_team_building], ['Dev', r.score_development],
+                      ['Appch', r.score_approachability], ['Prof', r.score_professionalism], ['Ded', r.score_dedication],
+                    ].map(([l, v]) => (
+                      <span key={l as string} className="font-mono text-[10px] px-2 py-0.5 rounded border"
+                        style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                        {l}: {(v as number).toFixed(1)}
+                      </span>
+                    ))}
+                  </div>
+                  {r.pros?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {r.pros.filter(Boolean).map((p, i) => (
+                        <span key={i} className="font-mono text-[10px] px-2 py-0.5 rounded-md"
+                          style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)' }}>+{p}</span>
                       ))}
                     </div>
-
-                    {r.pros?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {r.pros.filter(Boolean).map((p, i) => (
-                          <span key={i} className="font-mono text-[10px] px-2 py-0.5 rounded-md"
-                            style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)' }}>+{p}</span>
-                        ))}
-                      </div>
-                    )}
-                    {r.cons?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {r.cons.filter(Boolean).map((c, i) => (
-                          <span key={i} className="font-mono text-[10px] px-2 py-0.5 rounded-md"
-                            style={{ background: 'var(--fg-red-pale)', color: 'var(--fg-red)' }}>-{c}</span>
-                        ))}
-                      </div>
-                    )}
-                    {r.body && <p className="text-sm mt-2 mb-3 leading-relaxed" style={{ color: 'var(--fg-text2)' }}>{r.body}</p>}
-
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-3 border-t" style={{ borderColor: 'var(--fg-border)' }}>
-                      {reviewFilter !== 'approved' && (
-                        <ActionBtn label="Approve" color="green" loading={actionLoading === r.id} onClick={() => handleReviewAction(r.id, 'approved')} />
-                      )}
-                      {reviewFilter !== 'rejected' && (
-                        <ActionBtn label="Reject" color="amber" loading={actionLoading === r.id} onClick={() => handleReviewAction(r.id, 'rejected')} />
-                      )}
-                      <ActionBtn label="Delete" color="red" loading={actionLoading === r.id} onClick={() => handleReviewAction(r.id, 'delete')} />
+                  )}
+                  {r.cons?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {r.cons.filter(Boolean).map((c, i) => (
+                        <span key={i} className="font-mono text-[10px] px-2 py-0.5 rounded-md"
+                          style={{ background: 'var(--fg-red-pale)', color: 'var(--fg-red)' }}>-{c}</span>
+                      ))}
                     </div>
+                  )}
+                  {r.body && <p className="text-sm mt-2 mb-3 leading-relaxed" style={{ color: 'var(--fg-text2)' }}>{r.body}</p>}
+                  <div className="flex gap-2 pt-3 border-t" style={{ borderColor: 'var(--fg-border)' }}>
+                    {showApprove && <ActionBtn label="Approve" color="green" loading={actionLoading === r.id} onClick={() => handleReviewAction(r.id, 'approved')} />}
+                    {showReject && <ActionBtn label="Reject" color="amber" loading={actionLoading === r.id} onClick={() => handleReviewAction(r.id, 'rejected')} />}
+                    <ActionBtn label="Delete" color="red" loading={actionLoading === r.id} onClick={() => handleReviewAction(r.id, 'delete')} />
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              )
+              return (
+                <div className="space-y-8">
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>PENDING APPROVAL</span>
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#f59e0b', color: 'white' }}>{pending.length}</span>
+                    </div>
+                    {pending.length === 0 ? (
+                      <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                        <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>No pending reviews</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">{pending.map(r => renderReview(r, true, true))}</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>APPROVED</span>
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--fg-green)', color: 'white' }}>{approved.length}</span>
+                    </div>
+                    {approved.length === 0 ? (
+                      <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                        <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>No approved reviews yet</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">{approved.map(r => renderReview(r, false, true))}</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
           </>
         )}
 
         {/* Listings tab */}
         {tab === 'listings' && (
           <>
-            <FilterBar<ListingFilter>
-              options={[
-                { value: 'pending', label: 'Pending' },
-                { value: 'active', label: 'Active' },
-                { value: 'removed', label: 'Removed' },
-              ]}
-              value={listingFilter}
-              onChange={setListingFilter}
-            />
             <BulkToolbar count={selectedListings.size} loading={actionLoading === 'bulk-listings'} actions={[
               { label: 'Approve', color: 'green', onClick: () => handleBulkListings('active') },
               { label: 'Remove', color: 'amber', onClick: () => handleBulkListings('removed') },
               { label: 'Delete', color: 'red', onClick: () => handleBulkListings('delete') },
             ]} />
-            {loading ? <Skeleton /> : listings.length === 0 ? (
-              <EmptyState text={`No ${listingFilter} listings`} />
-            ) : (
-              <div className="space-y-3">
-                {listings.length > 0 && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 rounded"
-                      checked={listings.length > 0 && listings.every(l => selectedListings.has(l.id))}
-                      onChange={() => toggleAllSelection(selectedListings, setSelectedListings, listings.map(l => l.id))} />
-                    <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all</span>
-                  </label>
-                )}
-                {listings.map(l => (
+            {loading ? <Skeleton /> : (() => {
+              const pending = listings.filter(l => l.status === 'pending')
+              const active = listings.filter(l => l.status === 'active')
+              const renderListingSection = (items: typeof listings, sectionLabel: string, badgeColor: string) => (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>{sectionLabel}</span>
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: badgeColor, color: 'white' }}>{items.length}</span>
+                    </div>
+                    {items.length > 0 && (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" className="w-4 h-4 rounded"
+                          checked={items.length > 0 && items.every(l => selectedListings.has(l.id))}
+                          onChange={() => toggleAllSelection(selectedListings, setSelectedListings, items.map(l => l.id))} />
+                        <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all ({items.length})</span>
+                      </label>
+                    )}
+                  </div>
+                  {items.length === 0 ? (
+                    <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                      <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>No {sectionLabel.toLowerCase()} listings</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {items.map(l => (
                   <div key={l.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: selectedListings.has(l.id) ? 'var(--fg-green)' : 'var(--fg-border)' }} data-testid={`admin-listing-${l.id}`}>
                     {editingListing === l.id ? (
                       /* ── Edit mode ── */
@@ -846,9 +860,18 @@ export default function Admin() {
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+              return (
+                <div className="space-y-8">
+                  {renderListingSection(pending, 'PENDING APPROVAL', '#f59e0b')}
+                  {renderListingSection(active, 'ACTIVE', 'var(--fg-green)')}
+                </div>
+              )
+            })()}
           </>
         )}
 
