@@ -1,0 +1,4 @@
+// Storage is managed by Supabase — this file exists for template compatibility
+export interface IStorage {}
+export class DatabaseStorage implements IStorage {}
+export const storage = new DatabaseStorage();

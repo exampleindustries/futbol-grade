@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --button-outline: rgba(0, 0, 0, 0.1);
+  --badge-outline: rgba(0, 0, 0, 0.05);
+  --opaque-button-border-intensity: -8;
+  --elevate-1: rgba(0, 0, 0, 0.03);
+  --elevate-2: rgba(0, 0, 0, 0.08);
+  --background: 140 15% 96%;
+  --foreground: 150 30% 11%;
+  --border: 148 18% 88%;
+  --card: 0 0% 100%;
+  --card-foreground: 150 30% 11%;
+  --card-border: 148 18% 90%;
+  --sidebar: 140 15% 94%;
+  --sidebar-foreground: 150 30% 11%;
+  --sidebar-border: 148 18% 87%;
+  --sidebar-primary: 145 62% 28%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 145 15% 88%;
+  --sidebar-accent-foreground: 150 30% 11%;
+  --sidebar-ring: 145 62% 28%;
+  --popover: 140 12% 95%;
+  --popover-foreground: 150 30% 11%;
+  --popover-border: 148 18% 88%;
+  --primary: 145 62% 28%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 145 12% 90%;
+  --secondary-foreground: 150 30% 11%;
+  --muted: 145 10% 90%;
+  --muted-foreground: 150 14% 48%;
+  --accent: 145 12% 92%;
+  --accent-foreground: 150 30% 11%;
+  --destructive: 0 72% 47%;
+  --destructive-foreground: 0 0% 98%;
+  --input: 148 14% 76%;
+  --ring: 145 62% 28%;
+  --chart-1: 145 62% 28%;
+  --chart-2: 42 87% 42%;
+  --chart-3: 173 58% 39%;
+  --chart-4: 0 72% 47%;
+  --chart-5: 262 60% 48%;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: 'DM Mono', monospace;
+  --radius: 0.75rem;
+  --shadow-2xs: 0px 1px 2px rgba(0,0,0,0.04);
+  --shadow-xs: 0px 1px 3px rgba(0,0,0,0.06);
+  --shadow-sm: 0px 2px 4px rgba(0,0,0,0.06);
+  --shadow: 0px 2px 8px rgba(0,0,0,0.06);
+  --shadow-md: 0px 4px 12px rgba(0,0,0,0.07);
+  --shadow-lg: 0px 8px 24px rgba(0,0,0,0.08);
+  --shadow-xl: 0px 12px 32px rgba(0,0,0,0.1);
+  --shadow-2xl: 0px 16px 48px rgba(0,0,0,0.12);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  /* Futbol Grade brand colors */
+  --fg-green: #1a6e38;
+  --fg-green-mid: #22903f;
+  --fg-green-light: #2eaa50;
+  --fg-green-pale: #e8f5ed;
+  --fg-green-tint: #f0faf3;
+  --fg-gold: #c8920a;
+  --fg-gold-pale: #fef6e4;
+  --fg-red: #c0392b;
+  --fg-red-mid: #d4620a;
+  --fg-red-pale: #fdf0ee;
+  --fg-text: #1a2e22;
+  --fg-text2: #3a5240;
+  --fg-muted: #7a9882;
+  --fg-border: #dce8e1;
+  --fg-border2: #c5d9cc;
+  --fg-surface: #ffffff;
+  --fg-surface2: #f7faf8;
+  --fg-bg: #f3f6f4;
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+.dark {
+  --button-outline: rgba(255, 255, 255, 0.1);
+  --badge-outline: rgba(255, 255, 255, 0.05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255, 255, 255, 0.04);
+  --elevate-2: rgba(255, 255, 255, 0.09);
+  --background: 150 15% 7%;
+  --foreground: 140 10% 95%;
+  --border: 150 10% 18%;
+  --card: 150 12% 10%;
+  --card-foreground: 140 10% 95%;
+  --card-border: 150 10% 15%;
+  --sidebar: 150 12% 10%;
+  --sidebar-foreground: 140 10% 95%;
+  --sidebar-border: 150 10% 16%;
+  --sidebar-primary: 145 62% 40%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 150 10% 18%;
+  --sidebar-accent-foreground: 140 10% 95%;
+  --sidebar-ring: 145 62% 40%;
+  --popover: 150 10% 12%;
+  --popover-foreground: 140 10% 95%;
+  --popover-border: 150 10% 18%;
+  --primary: 145 62% 40%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 150 10% 18%;
+  --secondary-foreground: 140 10% 95%;
+  --muted: 150 8% 20%;
+  --muted-foreground: 145 10% 60%;
+  --accent: 150 8% 18%;
+  --accent-foreground: 140 10% 95%;
+  --destructive: 0 72% 47%;
+  --destructive-foreground: 0 0% 98%;
+  --input: 150 8% 28%;
+  --ring: 145 62% 40%;
+  --chart-1: 145 62% 50%;
+  --chart-2: 42 87% 58%;
+  --chart-3: 173 58% 50%;
+  --chart-4: 0 72% 55%;
+  --chart-5: 262 60% 60%;
+  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0);
+
+  --fg-green: #2eaa50;
+  --fg-green-mid: #36c25c;
+  --fg-green-light: #3fd768;
+  --fg-green-pale: rgba(46,170,80,0.15);
+  --fg-green-tint: rgba(46,170,80,0.08);
+  --fg-gold: #e0a80d;
+  --fg-gold-pale: rgba(200,146,10,0.15);
+  --fg-red: #e74c3c;
+  --fg-red-mid: #e67e22;
+  --fg-red-pale: rgba(192,57,43,0.15);
+  --fg-text: #e8f0ec;
+  --fg-text2: #b0c8b8;
+  --fg-muted: #6a8870;
+  --fg-border: #2a3e30;
+  --fg-border2: #3a5040;
+  --fg-surface: hsl(150 12% 10%);
+  --fg-surface2: hsl(150 10% 12%);
+  --fg-bg: hsl(150 15% 7%);
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply font-sans antialiased;
+    background: var(--fg-bg);
+    color: var(--fg-text);
+  }
+}
+
+/* Bebas Neue font class */
+.font-bebas { font-family: 'Bebas Neue', cursive; }
+
+/* KPI bar animations */
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46,170,80,0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(46,170,80,0); }
+}
+.rating-pulse { animation: pulse-green 2s infinite; }
+
+/* Card hover shadow */
+.shadow-card { box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); }
+.shadow-card-hover { box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 10px -5px rgba(0,0,0,0.04); }
+
+/* Page transitions */
+.page-enter { opacity: 0; transform: translateY(8px); }
+.page-enter-active {
+  opacity: 1; transform: translateY(0);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+@layer utilities {
+  input[type='search']::-webkit-search-cancel-button { @apply hidden; }
+}
