@@ -1,6 +1,9 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
+// In production, API calls go to the Railway backend.
+// Locally (dev server), API calls are relative (same origin).
+const RAILWAY_API = import.meta.env.VITE_API_URL || "";
+const API_BASE = RAILWAY_API || ("__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__");
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

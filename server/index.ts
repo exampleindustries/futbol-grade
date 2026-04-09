@@ -8,6 +8,19 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
+// CORS — allow Cloudflare Pages frontend to call Railway API
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  if (origin.includes('futbolgrade.com') || origin.includes('localhost')) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
