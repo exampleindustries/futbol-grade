@@ -19,7 +19,10 @@ interface Stats {
 }
 
 export default function Admin() {
-  const { user, profile, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth()
+
+  // Always re-fetch profile on admin page load to avoid stale cache
+  useEffect(() => { refreshProfile() }, [])  // eslint-disable-line react-hooks/exhaustive-deps
   const [tab, setTab] = useState<Tab>('reviews')
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('pending')
   const [listingFilter, setListingFilter] = useState<ListingFilter>('pending')
