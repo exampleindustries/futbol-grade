@@ -28,7 +28,11 @@ export function ClubCard({ club }: { club: Club }) {
               className="w-14 h-14 rounded-xl flex items-center justify-center font-bebas text-lg flex-shrink-0 border-[1.5px] overflow-hidden"
               style={{ borderColor: 'var(--fg-border)', background: 'var(--fg-green-pale)', color: 'var(--fg-green)' }}
             >
-              {club.abbr || club.name.slice(0, 3).toUpperCase()}
+              {club.logo_url ? (
+                <img src={club.logo_url} alt={club.name} className="w-full h-full object-contain" />
+              ) : (
+                club.abbr || club.name.slice(0, 3).toUpperCase()
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-[15px] truncate" style={{ color: 'var(--fg-text)' }}>{club.name}</div>

@@ -5,7 +5,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase'
 import type { FGEvent, Club } from '@/lib/types'
 
-const API = import.meta.env.VITE_API_URL || ''
+import { API_BASE } from '@/lib/api'
+const API = API_BASE
 
 function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })

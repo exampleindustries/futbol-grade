@@ -1760,7 +1760,8 @@ export default function Admin() {
 function getApiBase() {
   const base = "__PORT_5000__"
   if (!base.startsWith("__")) return base
-  return import.meta.env.VITE_API_URL || ''
+  // Hardcoded fallback — never rely on env vars alone
+  return import.meta.env.VITE_API_URL || 'https://web-production-67f2.up.railway.app'
 }
 
 function StatCard({ label, value, accent }: { label: string; value: number; accent?: boolean }) {

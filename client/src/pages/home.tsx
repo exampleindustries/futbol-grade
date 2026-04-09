@@ -4,7 +4,8 @@ import type { Coach, Club } from '@/lib/types'
 import { Nav } from '@/components/layout/Nav'
 import { ClubBadge } from '@/components/ui/ClubBadge'
 
-const API = import.meta.env.VITE_API_URL || ''
+import { API_BASE } from '@/lib/api'
+const API = API_BASE
 const AGE_GROUPS = ['U6', 'U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'U19+']
 const RADIUS_OPTIONS = [5, 10, 15, 25, 50]
 
