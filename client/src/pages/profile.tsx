@@ -30,7 +30,7 @@ export default function Profile() {
     </div>
   )
 
-  if (!user) { window.location.hash = '#/auth/login'; return null }
+  if (!user) { window.location.href = '/auth/login'; return null }
 
   function regenAlias() {
     const a = generateAlias()

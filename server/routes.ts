@@ -73,7 +73,7 @@ function buildAlertHtml(type: "review" | "listing", details: Record<string, stri
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;margin-bottom:20px;">
           ${rows}
         </table>
-        <a href="https://exampleindustries.github.io/futbol-grade/#/admin"
+        <a href="https://futbolgrade.com/admin"
            style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">
           Review in Admin Panel &#8594;
         </a>
@@ -118,7 +118,7 @@ function buildCoachAlertHtml(coachName: string, scores: Record<string, number>, 
           </tr>
         </table>
         <p style="margin:16px 0 20px;color:#9ca3af;font-size:12px;">Reviewer details are kept confidential.</p>
-        <a href="https://exampleindustries.github.io/futbol-grade/#/coaches/${coachId}"
+        <a href="https://futbolgrade.com/coaches/${coachId}"
            style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">
           View Your Profile &#8594;
         </a>
@@ -179,7 +179,7 @@ function buildClaimApprovalHtml(coachName: string, coachId: string) {
             </td>
           </tr>
         </table>
-        <a href="https://exampleindustries.github.io/futbol-grade/#/coaches/${coachId}"
+        <a href="https://futbolgrade.com/coaches/${coachId}"
            style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">
           View Your Verified Profile &#8594;
         </a>

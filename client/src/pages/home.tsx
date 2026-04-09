@@ -26,7 +26,7 @@ export default function Home() {
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
-    if (search.trim()) window.location.hash = `#/coaches?q=${encodeURIComponent(search)}`
+    if (search.trim()) window.location.href = `/coaches?q=${encodeURIComponent(search)}`
   }
 
   return (
@@ -67,10 +67,10 @@ export default function Home() {
             </button>
           </form>
           <div className="flex gap-4 mt-6">
-            <a href="#/coaches" className="font-mono text-[11px] font-bold tracking-widest text-white/50 hover:text-white/80 transition-colors uppercase" data-testid="hero-browse-coaches">
+            <a href="/coaches" className="font-mono text-[11px] font-bold tracking-widest text-white/50 hover:text-white/80 transition-colors uppercase" data-testid="hero-browse-coaches">
               Browse Coaches →
             </a>
-            <a href="#/clubs" className="font-mono text-[11px] font-bold tracking-widest text-white/50 hover:text-white/80 transition-colors uppercase" data-testid="hero-browse-clubs">
+            <a href="/clubs" className="font-mono text-[11px] font-bold tracking-widest text-white/50 hover:text-white/80 transition-colors uppercase" data-testid="hero-browse-clubs">
               Browse Clubs →
             </a>
           </div>
@@ -84,7 +84,7 @@ export default function Home() {
             <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Top Rated</span>
             <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: 'var(--fg-text)' }}>COACHES</h2>
           </div>
-          <a href="#/coaches" className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all hover:bg-gray-50" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }} data-testid="see-all-coaches">
+          <a href="/coaches" className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all hover:bg-gray-50" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }} data-testid="see-all-coaches">
             See All →
           </a>
         </div>
@@ -115,7 +115,7 @@ export default function Home() {
             <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Top Rated</span>
             <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: 'var(--fg-text)' }}>CLUBS</h2>
           </div>
-          <a href="#/clubs" className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all hover:bg-gray-50" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }} data-testid="see-all-clubs">
+          <a href="/clubs" className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all hover:bg-gray-50" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text2)' }} data-testid="see-all-clubs">
             See All →
           </a>
         </div>

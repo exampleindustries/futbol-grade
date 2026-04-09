@@ -35,7 +35,7 @@ export default function CoachDetail() {
   useHead(coach ? {
     title: `${coach.first_name} ${coach.last_name} - Coach Rating ${coach.avg_overall.toFixed(1)}/5 | Futbol Grade`,
     description: `${coach.first_name} ${coach.last_name} rated ${coach.avg_overall.toFixed(1)}/5 by the community. ${coach.total_reviews} review${coach.total_reviews !== 1 ? 's' : ''}. ${coach.city || 'SoCal'} youth soccer coach.`,
-    url: `https://futbolgrade.com/#/coaches/${id}`,
+    url: `https://futbolgrade.com/coaches/${id}`,
   } : {})
 
   if (loading) return (
@@ -92,7 +92,7 @@ export default function CoachDetail() {
               </div>
               <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1">
                 {coach.club && (
-                  <a href={`#/clubs/${(coach.club as any).id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
+                  <a href={`/clubs/${(coach.club as any).id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
                     {(coach.club as any).name}
                   </a>
                 )}
@@ -122,7 +122,7 @@ export default function CoachDetail() {
         <div className="flex flex-wrap gap-3 mb-6">
           {user ? (
             <a
-              href={`#/coaches/${coach.id}/review`}
+              href={`/coaches/${coach.id}/review`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
               style={{ background: 'var(--fg-green)', boxShadow: '0 4px 16px rgba(26,110,56,.25)' }}
               data-testid="write-review-btn"
@@ -131,7 +131,7 @@ export default function CoachDetail() {
             </a>
           ) : (
             <a
-              href="#/auth/login"
+              href="/auth/login"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
               style={{ background: 'var(--fg-green)', boxShadow: '0 4px 16px rgba(26,110,56,.25)' }}
               data-testid="login-to-review-btn"
@@ -141,7 +141,7 @@ export default function CoachDetail() {
           )}
           {!coach.user_id && (
             <a
-              href={`#/coaches/${coach.id}/claim`}
+              href={`/coaches/${coach.id}/claim`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border transition-all hover:brightness-95"
               style={{ color: 'var(--fg-green)', borderColor: 'var(--fg-green)', background: 'var(--fg-green-pale)' }}
               data-testid="claim-profile-btn"

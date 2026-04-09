@@ -224,7 +224,7 @@ export default function Admin() {
                             {r.is_anonymous ? r.reviewer?.alias || 'Anonymous' : 'Named reviewer'}
                           </span>
                           <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>→</span>
-                          <a href={`#/coaches/${r.coach_id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
+                          <a href={`/coaches/${r.coach_id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
                             {r.coach ? `${r.coach.first_name} ${r.coach.last_name}` : r.coach_id.slice(0, 8)}
                           </a>
                         </div>
@@ -362,7 +362,7 @@ export default function Admin() {
                             {c.claimant?.alias || 'User'}
                           </span>
                           <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>→ claims</span>
-                          <a href={`#/coaches/${c.coach_id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
+                          <a href={`/coaches/${c.coach_id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
                             {c.coach ? `${c.coach.first_name} ${c.coach.last_name}` : c.coach_id.slice(0, 8)}
                           </a>
                         </div>

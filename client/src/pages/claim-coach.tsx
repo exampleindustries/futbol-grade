@@ -105,7 +105,7 @@ export default function ClaimCoach() {
         <div className="text-4xl mb-3">🔑</div>
         <h2 className="font-bebas text-2xl mb-2" style={{ color: 'var(--fg-text)' }}>Sign In Required</h2>
         <p className="text-sm mb-4" style={{ color: 'var(--fg-muted)' }}>Create an account or log in to claim this coach profile.</p>
-        <a href="#/auth/login" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
+        <a href="/auth/login" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
           style={{ background: 'var(--fg-green)' }} data-testid="login-to-claim">
           Log In
         </a>
@@ -120,7 +120,7 @@ export default function ClaimCoach() {
         <div className="text-4xl mb-3">✅</div>
         <h2 className="font-bebas text-2xl mb-2" style={{ color: 'var(--fg-text)' }}>Profile Already Claimed</h2>
         <p className="text-sm mb-4" style={{ color: 'var(--fg-muted)' }}>This coach profile has already been verified.</p>
-        <a href={`#/coaches/${coach.id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
+        <a href={`/coaches/${coach.id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
           ← Back to profile
         </a>
       </div>
@@ -136,7 +136,7 @@ export default function ClaimCoach() {
         <p className="text-sm mb-6 leading-relaxed" style={{ color: 'var(--fg-muted)' }}>
           We'll review your claim and verify your identity. You'll receive an email at <strong style={{ color: 'var(--fg-text)' }}>{email}</strong> once approved.
         </p>
-        <a href={`#/coaches/${coach.id}`} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
+        <a href={`/coaches/${coach.id}`} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
           style={{ background: 'var(--fg-green)' }} data-testid="back-to-profile">
           Back to Profile
         </a>
@@ -149,7 +149,7 @@ export default function ClaimCoach() {
       <Nav />
       <div className="max-w-lg mx-auto px-6 py-8">
         {/* Back link */}
-        <a href={`#/coaches/${coach.id}`} className="inline-flex items-center gap-1 font-mono text-xs font-semibold mb-6 hover:underline"
+        <a href={`/coaches/${coach.id}`} className="inline-flex items-center gap-1 font-mono text-xs font-semibold mb-6 hover:underline"
           style={{ color: 'var(--fg-green)' }} data-testid="back-link">
           ← {coach.first_name} {coach.last_name}
         </a>

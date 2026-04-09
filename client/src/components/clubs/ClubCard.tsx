@@ -16,7 +16,7 @@ export function ClubCard({ club }: { club: Club }) {
     : { color: 'var(--fg-red)', background: 'var(--fg-red-pale)', borderColor: 'rgba(192,57,43,.2)' }
 
   return (
-    <a href={`#/clubs/${club.id}`} className="block" data-testid={`club-card-${club.id}`}>
+    <a href={`/clubs/${club.id}`} className="block" data-testid={`club-card-${club.id}`}>
       <div
         className="bg-white border rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-1 shadow-card hover:shadow-card-hover"
         style={{ borderColor: 'var(--fg-border)' }}

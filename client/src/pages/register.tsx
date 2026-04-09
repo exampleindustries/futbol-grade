@@ -39,7 +39,7 @@ export default function Register() {
               <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
                 We sent a confirmation link to <strong>{email}</strong>. Click it to activate your account.
               </p>
-              <a href="#/auth/login" className="inline-block mt-6 px-6 py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--fg-green)' }}>
+              <a href="/auth/login" className="inline-block mt-6 px-6 py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--fg-green)' }}>
                 Go to Login →
               </a>
             </div>
@@ -83,7 +83,7 @@ export default function Register() {
               </form>
               <div className="text-center mt-6">
                 <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>Already have an account? </span>
-                <a href="#/auth/login" className="text-sm font-semibold" style={{ color: 'var(--fg-green)' }}>Log In</a>
+                <a href="/auth/login" className="text-sm font-semibold" style={{ color: 'var(--fg-green)' }}>Log In</a>
               </div>
             </>
           )}

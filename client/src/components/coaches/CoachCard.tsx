@@ -9,7 +9,7 @@ export function CoachCard({ coach }: { coach: Coach }) {
   const color = getRatingColor(overall)
 
   return (
-    <a href={`#/coaches/${coach.id}`} className="block" data-testid={`coach-card-${coach.id}`}>
+    <a href={`/coaches/${coach.id}`} className="block" data-testid={`coach-card-${coach.id}`}>
       <div
         className="bg-white border rounded-2xl p-5 cursor-pointer transition-all duration-200 hover:-translate-y-1 relative overflow-hidden shadow-card hover:shadow-card-hover"
         style={{ borderColor: 'var(--fg-border)' }}

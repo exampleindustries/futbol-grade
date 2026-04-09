@@ -33,7 +33,7 @@ export default function ClubDetail() {
   useHead(club ? {
     title: `${club.name} - Club Rating ${club.avg_overall.toFixed(1)}/5 | Futbol Grade`,
     description: `${club.name} rated ${club.avg_overall.toFixed(1)}/5. ${club.coach_count} coach${club.coach_count !== 1 ? 'es' : ''}, ${club.total_reviews} review${club.total_reviews !== 1 ? 's' : ''}. ${club.city || 'SoCal'} youth soccer club.`,
-    url: `https://futbolgrade.com/#/clubs/${id}`,
+    url: `https://futbolgrade.com/clubs/${id}`,
   } : {})
 
   if (loading) return (
