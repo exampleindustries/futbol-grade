@@ -243,6 +243,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Health check for Railway / hosting platforms
+  app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
+
   // Submit a review (requires auth)
   app.post("/api/reviews", reviewLimiter, async (req, res) => {
     try {
