@@ -653,7 +653,7 @@ export async function registerRoutes(
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
-      const allowed = ["status", "first_name", "last_name", "city", "state", "club_id", "gender", "age_groups", "license", "email"];
+      const allowed = ["status", "first_name", "last_name", "city", "state", "club_id", "gender", "age_groups", "license", "email", "specialization"];
       const updates: Record<string, any> = {};
       for (const key of allowed) {
         if (req.body[key] !== undefined) updates[key] = req.body[key];

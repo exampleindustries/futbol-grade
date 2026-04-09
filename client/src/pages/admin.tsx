@@ -350,6 +350,8 @@ export default function Admin() {
       club_id: c.club_id || '',
       license: c.license || '',
       email: c.email || '',
+      status: c.status || 'pending',
+      specialization: c.specialization || '',
     })
   }
 
@@ -1221,7 +1223,7 @@ export default function Admin() {
                                 className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>City</label>
                               <input value={coachEdits.city || ''} onChange={e => setCoachEdits(p => ({ ...p, city: e.target.value }))}
@@ -1232,10 +1234,19 @@ export default function Admin() {
                               <input value={coachEdits.state || ''} onChange={e => setCoachEdits(p => ({ ...p, state: e.target.value }))}
                                 className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
                             </div>
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Status</label>
+                              <select value={coachEdits.status || 'pending'} onChange={e => setCoachEdits(p => ({ ...p, status: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }}>
+                                <option value="approved">Approved</option>
+                                <option value="pending">Pending</option>
+                                <option value="rejected">Rejected</option>
+                              </select>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Club</label>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Club Assignment</label>
                               <select value={coachEdits.club_id || ''} onChange={e => setCoachEdits(p => ({ ...p, club_id: e.target.value || null }))}
                                 className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }}>
                                 <option value="">No club</option>
@@ -1276,6 +1287,11 @@ export default function Admin() {
                               })}
                             </div>
                           </div>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Specialization</label>
+                            <input value={coachEdits.specialization || ''} onChange={e => setCoachEdits(p => ({ ...p, specialization: e.target.value }))}
+                              placeholder="e.g. Goalkeeper, Striker Development, Fitness" className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                          </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>License</label>
@@ -1301,13 +1317,14 @@ export default function Admin() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{c.first_name} {c.last_name}</span>
-                              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded capitalize" style={{ background: c.status === 'approved' ? 'var(--fg-green-pale)' : 'var(--fg-surface)', color: c.status === 'approved' ? 'var(--fg-green)' : 'var(--fg-muted)' }}>{c.status}</span>
+                              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded capitalize" style={{ background: c.status === 'approved' ? 'var(--fg-green-pale)' : c.status === 'rejected' ? 'var(--fg-red-pale)' : 'var(--fg-surface)', color: c.status === 'approved' ? 'var(--fg-green)' : c.status === 'rejected' ? 'var(--fg-red)' : 'var(--fg-muted)' }}>{c.status}</span>
                             </div>
                             <div className="flex flex-wrap gap-1.5 mt-1">
                               {c.club && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>{c.club.name}</span>}
                               {c.city && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.city}, {c.state}</span>}
                               {c.gender && c.gender !== 'coed' && <span className="font-mono text-[10px] px-2 py-0.5 rounded border capitalize" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.gender}</span>}
                               {(c.age_groups || []).length > 0 && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{(c.age_groups || []).join(', ')}</span>}
+                              {(c as any).specialization && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-green)' }}>{(c as any).specialization}</span>}
                               {c.license && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.license}</span>}
                             </div>
                           </div>
