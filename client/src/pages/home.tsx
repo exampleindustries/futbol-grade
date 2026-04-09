@@ -72,8 +72,8 @@ function ClubMarquee({ clubs }: { clubs: Club[] }) {
   const doubled = [...clubs, ...clubs]
   return (
     <div className="overflow-hidden relative">
-      <div className="absolute left-0 top-0 bottom-0 w-16 z-10" style={{ background: 'linear-gradient(to right, var(--fg-bg), transparent)' }} />
-      <div className="absolute right-0 top-0 bottom-0 w-16 z-10" style={{ background: 'linear-gradient(to left, var(--fg-bg), transparent)' }} />
+      <div className="absolute left-0 top-0 bottom-0 w-16 z-10" style={{ background: 'linear-gradient(to right, #f7f5f0, transparent)' }} />
+      <div className="absolute right-0 top-0 bottom-0 w-16 z-10" style={{ background: 'linear-gradient(to left, #f7f5f0, transparent)' }} />
       <div className="flex gap-8 items-center animate-marquee">
         {doubled.map((c, i) => (
           <a key={`${c.id}-${i}`} href={`/clubs/${c.id}`}
@@ -246,7 +246,7 @@ export default function Home() {
       </section>
 
       {/* Club Marquee */}
-      <section className="py-10 border-y" style={{ borderColor: 'var(--fg-border)' }}>
+      <section className="py-10" style={{ background: '#f7f5f0' }}>
         <div className="max-w-6xl mx-auto px-6 mb-6">
           <div className="text-center">
             <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Featured Clubs</span>
