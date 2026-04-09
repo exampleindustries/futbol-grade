@@ -19,6 +19,7 @@ import ClaimCoach from "@/pages/claim-coach";
 import SelectCoach from "@/pages/select-coach";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import Events from "@/pages/events";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -33,6 +34,7 @@ function AppRouter() {
       <Route path="/clubs" component={Clubs} />
       <Route path="/clubs/:id" component={ClubDetail} />
       <Route path="/marketplace" component={Marketplace} />
+      <Route path="/events" component={Events} />
       <Route path="/auth/login" component={Login} />
       <Route path="/auth/register" component={Register} />
       <Route path="/auth/forgot-password" component={ForgotPassword} />

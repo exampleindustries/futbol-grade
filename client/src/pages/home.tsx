@@ -219,7 +219,7 @@ export default function Home() {
               { icon: '\u26bd', title: 'Clubs', desc: 'All SoCal youth soccer clubs ranked by community ratings', href: '/clubs' },
               { icon: '\ud83d\udcc5', title: 'By Age Group', desc: 'Find coaches for U8, U10, U12, U14, U16, and U18 teams', href: '/coaches' },
               { icon: '\ud83d\udccd', title: 'By Region', desc: 'San Diego, LA, Orange County, Inland Empire, and more', href: '/coaches' },
-              { icon: '\ud83c\udfc6', title: 'Events & Programs', desc: 'Camps, clinics, tournaments, and training programs', href: '/marketplace' },
+              { icon: '\ud83c\udfc6', title: 'Events & Programs', desc: 'Camps, clinics, tournaments, and training programs', href: '/events' },
             ].map(cat => (
               <a key={cat.title} href={cat.href}
                 className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg"

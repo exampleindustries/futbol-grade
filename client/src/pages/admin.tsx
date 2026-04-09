@@ -5,7 +5,7 @@ import { RatingBadge } from '@/components/ui/RatingBadge'
 import { apiRequest } from '@/lib/queryClient'
 import { supabase } from '@/lib/supabase'
 import { timeAgo, fullName } from '@/lib/fg-utils'
-import type { Review, Listing, CoachClaim, Coach } from '@/lib/types'
+import type { Review, Listing, CoachClaim, Coach, FGEvent } from '@/lib/types'
 
 function AdminLoginForm() {
   const [email, setEmail] = useState('')
@@ -61,7 +61,7 @@ function AdminLoginForm() {
   )
 }
 
-type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs'
+type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | 'events'
 
 interface AdminClub {
   id: string
@@ -96,6 +96,7 @@ interface Stats {
   listings: { pending: number; active: number }
   claims: { pending: number }
   imports: { pending: number }
+  events: { pending: number }
 }
 
 export default function Admin() {
@@ -121,6 +122,8 @@ export default function Admin() {
   const [editName, setEditName] = useState('')
   const [editCity, setEditCity] = useState('')
   const [editState, setEditState] = useState('')
+  const [adminEvents, setAdminEvents] = useState<(FGEvent & { club?: { id: string; name: string } | null })[]>([])
+  const [eventFilter, setEventFilter] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -178,6 +181,16 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchEvents = useCallback(async (status: string) => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`${getApiBase()}/api/admin/events?status=${status}`, { headers: { Authorization: auth } })
+      if (res.ok) setAdminEvents(await res.json())
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   const fetchClubs = useCallback(async () => {
     setLoading(true)
     try {
@@ -206,6 +219,7 @@ export default function Admin() {
   useEffect(() => { if (profile?.is_admin && tab === 'imports') fetchImports(importFilter) }, [profile, tab, importFilter, fetchImports])
   useEffect(() => { if (profile?.is_admin && tab === 'users') fetchUsers() }, [profile, tab, fetchUsers])
   useEffect(() => { if (profile?.is_admin && tab === 'clubs') fetchClubs() }, [profile, tab, fetchClubs])
+  useEffect(() => { if (profile?.is_admin && tab === 'events') fetchEvents(eventFilter) }, [profile, tab, eventFilter, fetchEvents])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
     setActionLoading(id)
@@ -285,6 +299,24 @@ export default function Admin() {
         body: JSON.stringify({ [field]: value }),
       })
       await fetchUsers(userSearch || undefined)
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  async function handleEventAction(id: string, action: 'approved' | 'rejected' | 'delete') {
+    setActionLoading(id)
+    try {
+      const auth = await getAuthHeader()
+      if (action === 'delete') {
+        await fetch(`${getApiBase()}/api/admin/events/${id}`, { method: 'DELETE', headers: { Authorization: auth } })
+      } else {
+        await fetch(`${getApiBase()}/api/admin/events/${id}`, {
+          method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: action }),
+        })
+      }
+      await fetchEvents(eventFilter)
+      await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
   }
@@ -425,8 +457,8 @@ export default function Admin() {
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings', 'claims', 'imports', 'users', 'clubs'] as Tab[]).map(t => {
-            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'users' ? users.length : adminClubs.length) : 0
+          {(['reviews', 'listings', 'claims', 'imports', 'events', 'users', 'clubs'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'users' ? users.length : adminClubs.length) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
                 className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
@@ -963,6 +995,93 @@ export default function Admin() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Events tab */}
+        {tab === 'events' && (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <FilterBar<'pending' | 'approved' | 'rejected'>
+                options={[
+                  { value: 'pending', label: 'Pending' },
+                  { value: 'approved', label: 'Approved' },
+                  { value: 'rejected', label: 'Rejected' },
+                ]}
+                value={eventFilter}
+                onChange={setEventFilter}
+              />
+              <button
+                onClick={async () => {
+                  setActionLoading('crawl')
+                  try {
+                    const auth = await getAuthHeader()
+                    const res = await fetch(`${getApiBase()}/api/admin/events/crawl`, {
+                      method: 'POST', headers: { Authorization: auth },
+                    })
+                    const data = await res.json()
+                    alert(data.message || 'Scan complete')
+                    await fetchEvents(eventFilter)
+                    await fetchStats()
+                  } catch { alert('Scan failed') }
+                  setActionLoading(null)
+                }}
+                disabled={actionLoading === 'crawl'}
+                className="font-mono text-[11px] font-semibold px-4 py-2 rounded-lg border transition-all whitespace-nowrap"
+                style={{ background: 'var(--fg-surface)', color: 'var(--fg-green)', borderColor: 'var(--fg-green)' }}
+                data-testid="crawl-events">
+                {actionLoading === 'crawl' ? 'Scanning...' : '🔍 Scan Club Websites'}
+              </button>
+            </div>
+            {loading ? <Skeleton /> : adminEvents.length === 0 ? (
+              <EmptyState text={`No ${eventFilter} event flyers`} />
+            ) : (
+              <div className="space-y-3">
+                {adminEvents.map(ev => (
+                  <div key={ev.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-event-${ev.id}`}>
+                    <div className="flex gap-4 p-4 sm:p-5">
+                      {ev.flyer_url && (
+                        <a href={ev.flyer_url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                          <img src={ev.flyer_url} alt={ev.title} className="w-24 h-24 object-cover rounded-lg border" style={{ borderColor: 'var(--fg-border)' }} />
+                        </a>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{ev.title}</div>
+                        <div className="flex flex-wrap gap-2 mt-1.5">
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-green)' }}>
+                            📅 {new Date(ev.event_date + 'T00:00:00').toLocaleDateString()}
+                            {ev.end_date && ev.end_date !== ev.event_date && ` – ${new Date(ev.end_date + 'T00:00:00').toLocaleDateString()}`}
+                          </span>
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded border capitalize" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>
+                            {ev.source.replace('_', ' ')}
+                          </span>
+                          {ev.club && (
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>
+                              {ev.club.name}
+                            </span>
+                          )}
+                        </div>
+                        {ev.description && (
+                          <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--fg-muted)' }}>{ev.description}</p>
+                        )}
+                        <div className="font-mono text-[10px] mt-2" style={{ color: 'var(--fg-muted)' }}>
+                          Submitted {timeAgo(ev.created_at)}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 flex-shrink-0">
+                        {eventFilter !== 'approved' && (
+                          <ActionBtn label="Approve" color="green" loading={actionLoading === ev.id} onClick={() => handleEventAction(ev.id, 'approved')} />
+                        )}
+                        {eventFilter !== 'rejected' && (
+                          <ActionBtn label="Reject" color="amber" loading={actionLoading === ev.id} onClick={() => handleEventAction(ev.id, 'rejected')} />
+                        )}
+                        <ActionBtn label="Delete" color="red" loading={actionLoading === ev.id} onClick={() => handleEventAction(ev.id, 'delete')} />
+                      </div>
                     </div>
                   </div>
                 ))}

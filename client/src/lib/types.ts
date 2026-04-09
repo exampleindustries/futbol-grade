@@ -141,6 +141,29 @@ export interface Listing {
   seller?: Pick<Profile, 'id' | 'alias' | 'alias_emoji' | 'avatar_url'> | null
 }
 
+export type EventSource = 'user_upload' | 'club_crawl' | 'admin'
+export type EventStatus = 'pending' | 'approved' | 'rejected' | 'expired'
+
+export interface FGEvent {
+  id: string
+  title: string
+  description: string | null
+  flyer_url: string | null
+  event_date: string
+  end_date: string | null
+  club_id: string | null
+  source: EventSource
+  status: EventStatus
+  submitted_by: string | null
+  approved_by: string | null
+  approved_at: string | null
+  source_url: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  club?: Pick<Club, 'id' | 'name' | 'logo_url'> | null
+}
+
 // KPI keys for iteration
 export const KPI_SCORE_KEYS = [
   'score_technical',

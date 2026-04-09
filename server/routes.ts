@@ -840,6 +840,222 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Events (public) ─────────────────────────────────────────
+
+  app.get("/api/events", async (req, res) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from("events")
+        .select("*, club:clubs(id, name, logo_url)")
+        .eq("status", "approved")
+        .gte("event_date", new Date().toISOString().split("T")[0])
+        .order("event_date", { ascending: true })
+        .limit(50);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // Submit event flyer (authenticated users)
+  app.post("/api/events", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return res.status(401).json({ error: "Not authenticated" });
+      const supabase = getSupabaseClient(authHeader);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      const { title, description, flyer_url, event_date, end_date, club_id } = req.body;
+      if (!title || !event_date) return res.status(400).json({ error: "Title and event date are required" });
+
+      const { data, error } = await supabase.from("events").insert({
+        title,
+        description: description || null,
+        flyer_url: flyer_url || null,
+        event_date,
+        end_date: end_date || null,
+        club_id: club_id || null,
+        source: "user_upload",
+        status: "pending",
+        submitted_by: user.id,
+      }).select().single();
+      if (error) return res.status(400).json({ error: error.message });
+
+      // Send admin alert
+      sendAdminAlert("listing", {
+        "Type": "Event Flyer Submission",
+        "Title": title,
+        "Event Date": event_date,
+        "Description": description || "(none)",
+      });
+
+      return res.status(201).json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // ── Admin: Events ───────────────────────────────────────────
+
+  app.get("/api/admin/events", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const status = (req.query.status as string) || "pending";
+      const { data, error } = await supabase
+        .from("events")
+        .select("*, club:clubs(id, name)")
+        .eq("status", status)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.patch("/api/admin/events/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      const updates: Record<string, any> = {};
+      if (req.body.status) {
+        updates.status = req.body.status;
+        if (req.body.status === "approved") {
+          updates.approved_by = user?.id;
+          updates.approved_at = new Date().toISOString();
+        }
+      }
+      if (!Object.keys(updates).length) return res.status(400).json({ error: "No valid fields" });
+      const { error } = await supabase.from("events").update(updates).eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.delete("/api/admin/events/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { error } = await supabase.from("events").delete().eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // ── Admin: Crawl club websites for events ─────────────
+
+  app.post("/api/admin/events/crawl", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Get clubs with websites
+      const { data: clubs } = await supabase
+        .from("clubs")
+        .select("id, name, website")
+        .not("website", "is", null)
+        .eq("status", "approved");
+
+      if (!clubs || clubs.length === 0) {
+        return res.json({ found: 0, message: "No clubs with websites to scan" });
+      }
+
+      const eventKeywords = /camp|clinic|tournament|tryout|training|showcase|league|cup|classic|festival|jamboree|combine/i;
+      let found = 0;
+
+      for (const club of clubs) {
+        if (!club.website) continue;
+        try {
+          // Fetch club homepage and common event paths
+          const urls = [
+            club.website,
+            `${club.website}/events`,
+            `${club.website}/camps`,
+            `${club.website}/tournaments`,
+            `${club.website}/programs`,
+            `${club.website}/news`,
+          ];
+
+          for (const url of urls) {
+            try {
+              const resp = await fetch(url, {
+                signal: AbortSignal.timeout(8000),
+                headers: { "User-Agent": "FutbolGrade-EventScanner/1.0" },
+              });
+              if (!resp.ok) continue;
+              const html = await resp.text();
+
+              // Check if already crawled this URL
+              const { data: existing } = await supabase
+                .from("events")
+                .select("id")
+                .eq("source_url", url)
+                .limit(1);
+              if (existing && existing.length > 0) continue;
+
+              // Look for event-like content
+              if (!eventKeywords.test(html)) continue;
+
+              // Extract title from page
+              const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+              const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+              const pageTitle = h1Match?.[1]?.trim() || titleMatch?.[1]?.trim() || "Event";
+
+              // Look for dates (common formats)
+              const datePatterns = [
+                /(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}/gi,
+                /\d{1,2}\/\d{1,2}\/\d{4}/g,
+                /\d{4}-\d{2}-\d{2}/g,
+              ];
+              let eventDate: string | null = null;
+              for (const pat of datePatterns) {
+                const m = html.match(pat);
+                if (m) {
+                  const d = new Date(m[0]);
+                  if (!isNaN(d.getTime()) && d > new Date()) {
+                    eventDate = d.toISOString().split("T")[0];
+                    break;
+                  }
+                }
+              }
+
+              // Look for image URLs that might be flyers
+              const imgPattern = /(?:src|href)=["']([^"']+\.(?:jpg|jpeg|png|webp|gif|pdf))["']/gi;
+              let flyerUrl: string | null = null;
+              let match;
+              while ((match = imgPattern.exec(html)) !== null) {
+                const imgUrl = match[1];
+                if (eventKeywords.test(imgUrl)) {
+                  flyerUrl = imgUrl.startsWith("http") ? imgUrl : new URL(imgUrl, url).href;
+                  break;
+                }
+              }
+
+              // Only create event if we found a future date or event keywords in title
+              if (eventDate || eventKeywords.test(pageTitle)) {
+                await supabase.from("events").insert({
+                  title: pageTitle.length > 100 ? pageTitle.slice(0, 100) : pageTitle,
+                  description: `Auto-discovered from ${club.name} website`,
+                  flyer_url: flyerUrl,
+                  event_date: eventDate || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+                  club_id: club.id,
+                  source: "club_crawl",
+                  status: "pending",
+                  submitted_by: user?.id,
+                  source_url: url,
+                });
+                found++;
+              }
+            } catch { /* skip individual URL errors */ }
+          }
+        } catch { /* skip club errors */ }
+      }
+
+      return res.json({ found, message: `Scanned ${clubs.length} club websites, found ${found} potential events` });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   // ── Admin: Stats ─────────────────────────────────────────────
 
   app.get("/api/admin/stats", async (req, res) => {
@@ -855,11 +1071,13 @@ export async function registerRoutes(
         supabase.from("coach_claims").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("coaches").select("id", { count: "exact", head: true }).eq("status", "pending"),
       ]);
+      const pe = await supabase.from("events").select("id", { count: "exact", head: true }).eq("status", "pending");
       return res.json({
         reviews: { pending: pr.count || 0, approved: ar.count || 0, rejected: rr.count || 0 },
         listings: { pending: pl.count || 0, active: al.count || 0 },
         claims: { pending: pc.count || 0 },
         imports: { pending: pci.count || 0 },
+        events: { pending: pe.count || 0 },
       });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
