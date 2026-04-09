@@ -7,6 +7,60 @@ import { supabase } from '@/lib/supabase'
 import { timeAgo, fullName } from '@/lib/fg-utils'
 import type { Review, Listing, CoachClaim } from '@/lib/types'
 
+function AdminLoginForm() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      // Auth state change will trigger re-render with user set
+    } catch (err: any) {
+      setError(err.message || 'Invalid credentials')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block font-mono text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--fg-muted)' }}>Email</label>
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+          className="w-full border rounded-lg px-4 py-2.5 text-sm outline-none"
+          style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }}
+          data-testid="admin-login-email" />
+      </div>
+      <div>
+        <label className="block font-mono text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--fg-muted)' }}>Password</label>
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
+          className="w-full border rounded-lg px-4 py-2.5 text-sm outline-none"
+          style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }}
+          data-testid="admin-login-password" />
+      </div>
+      <div className="text-right">
+        <a href="/auth/forgot-password" className="font-mono text-[11px] font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>Forgot password?</a>
+      </div>
+      {error && (
+        <div className="text-sm font-medium px-4 py-3 rounded-lg border"
+          style={{ background: 'var(--fg-red-pale)', color: 'var(--fg-red)', borderColor: 'rgba(192,57,43,.2)' }}>{error}</div>
+      )}
+      <button type="submit" disabled={loading}
+        className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all"
+        style={{ background: 'var(--fg-green)' }}
+        data-testid="admin-login-submit">
+        {loading ? 'Signing in...' : 'Sign In'}
+      </button>
+    </form>
+  )
+}
+
 type Tab = 'reviews' | 'listings' | 'claims'
 type ReviewFilter = 'pending' | 'approved' | 'rejected'
 type ListingFilter = 'pending' | 'active' | 'removed'
@@ -149,13 +203,29 @@ export default function Admin() {
     </div>
   )
 
-  if (!user || !profile?.is_admin) return (
+  if (!user) return (
+    <div style={{ background: 'var(--fg-bg)', minHeight: '100vh' }}>
+      <Nav />
+      <div className="max-w-md mx-auto px-6 py-16">
+        <div className="bg-white border rounded-2xl p-8" style={{ borderColor: 'var(--fg-border)' }}>
+          <div className="text-center mb-6">
+            <div className="text-3xl mb-2">🔒</div>
+            <h1 className="font-bebas text-3xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>ADMIN LOGIN</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>Sign in with your admin credentials</p>
+          </div>
+          <AdminLoginForm />
+        </div>
+      </div>
+    </div>
+  )
+
+  if (!profile?.is_admin) return (
     <div style={{ background: 'var(--fg-bg)', minHeight: '100vh' }}>
       <Nav />
       <div className="max-w-5xl mx-auto px-6 py-20 text-center">
-        <div className="text-4xl mb-3">🔒</div>
-        <h2 className="font-bebas text-2xl mb-2" style={{ color: 'var(--fg-text)' }}>Admin Only</h2>
-        <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>You must be an admin to access this page.</p>
+        <div className="text-4xl mb-3">🚫</div>
+        <h2 className="font-bebas text-2xl mb-2" style={{ color: 'var(--fg-text)' }}>Access Denied</h2>
+        <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>This account does not have admin privileges.</p>
       </div>
     </div>
   )
