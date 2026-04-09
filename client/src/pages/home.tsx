@@ -210,10 +210,10 @@ export default function Home() {
       {/* Recently Reviewed — Carousel */}
       <section className="py-12" style={{ background: '#f0f5f1' }}>
         <div className="max-w-6xl mx-auto px-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 border rounded-xl px-5 py-4" style={{ background: 'linear-gradient(135deg, #fef9ec 0%, #fdf3d7 100%)', borderColor: '#f0d68a' }}>
             <div>
-              <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-green)' }}>Recently Reviewed</span>
-              <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: 'var(--fg-text)' }}>TOP RATED COACHES</h2>
+              <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: '#b8860b' }}>Recently Reviewed</span>
+              <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: '#5c4813' }}>TOP RATED COACHES</h2>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => scrollCarousel(-1)} className="w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-gray-50 transition-colors"
