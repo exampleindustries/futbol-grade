@@ -1263,5 +1263,30 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Admin: Audit Log ───────────────────────────────────
+
+  app.get("/api/admin/audit-log", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const entityType = req.query.entity_type as string;
+      const action = req.query.action as string;
+
+      let query = supabase
+        .from("admin_audit_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (entityType) query = query.eq("entity_type", entityType);
+      if (action) query = query.eq("action", action);
+
+      const { data, error } = await query;
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   return httpServer;
 }

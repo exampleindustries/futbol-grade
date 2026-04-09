@@ -61,7 +61,7 @@ function AdminLoginForm() {
   )
 }
 
-type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | 'events' | 'coaches'
+type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | 'events' | 'coaches' | 'audit'
 
 interface AdminClub {
   id: string
@@ -129,6 +129,8 @@ export default function Admin() {
   const [selectedCoaches, setSelectedCoaches] = useState<Set<string>>(new Set())
   const [selectedClubs, setSelectedClubs] = useState<Set<string>>(new Set())
   const [selectedListings, setSelectedListings] = useState<Set<string>>(new Set())
+  const [auditLog, setAuditLog] = useState<any[]>([])
+  const [auditFilter, setAuditFilter] = useState<string>('')
   const [allCoaches, setAllCoaches] = useState<(Coach & { club?: { id: string; name: string; city: string } | null })[]>([])
   const [coachSearch, setCoachSearch] = useState('')
   const [editingCoach, setEditingCoach] = useState<string | null>(null)
@@ -202,6 +204,17 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchAuditLog = useCallback(async (entityType?: string) => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const q = entityType ? `?entity_type=${entityType}` : ''
+      const res = await fetch(`${getApiBase()}/api/admin/audit-log${q}`, { headers: { Authorization: auth } })
+      if (res.ok) setAuditLog(await res.json())
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   const fetchAllCoaches = useCallback(async () => {
     setLoading(true)
     try {
@@ -242,6 +255,7 @@ export default function Admin() {
   useEffect(() => { if (profile?.is_admin && tab === 'clubs') fetchClubs() }, [profile, tab, fetchClubs])
   useEffect(() => { if (profile?.is_admin && tab === 'events') fetchEvents(eventFilter) }, [profile, tab, eventFilter, fetchEvents])
   useEffect(() => { if (profile?.is_admin && tab === 'coaches') fetchAllCoaches() }, [profile, tab, fetchAllCoaches])
+  useEffect(() => { if (profile?.is_admin && tab === 'audit') fetchAuditLog(auditFilter || undefined) }, [profile, tab, auditFilter, fetchAuditLog])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
     setActionLoading(id)
@@ -594,8 +608,8 @@ export default function Admin() {
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings', 'claims', 'imports', 'events', 'coaches', 'users', 'clubs'] as Tab[]).map(t => {
-            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'coaches' ? allCoaches.length : t === 'users' ? users.length : adminClubs.length) : 0
+          {(['reviews', 'listings', 'claims', 'imports', 'events', 'coaches', 'users', 'clubs', 'audit'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'coaches' ? allCoaches.length : t === 'users' ? users.length : t === 'clubs' ? adminClubs.length : t === 'audit' ? auditLog.length : 0) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
                 className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
@@ -1542,6 +1556,84 @@ export default function Admin() {
                 </div>
               )
             })()}
+          </>
+        )}
+
+        {/* Audit Log tab */}
+        {tab === 'audit' && (
+          <>
+            <div className="flex gap-1.5 mb-4 overflow-x-auto">
+              {[{ v: '', l: 'All' }, { v: 'review', l: 'Reviews' }, { v: 'listing', l: 'Listings' }, { v: 'coach', l: 'Coaches' }, { v: 'club', l: 'Clubs' }, { v: 'claim', l: 'Claims' }, { v: 'event', l: 'Events' }].map(f => (
+                <button key={f.v} onClick={() => setAuditFilter(f.v)}
+                  className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all whitespace-nowrap"
+                  style={auditFilter === f.v
+                    ? { background: 'var(--fg-text)', color: 'white', borderColor: 'var(--fg-text)' }
+                    : { background: 'var(--fg-surface)', color: 'var(--fg-muted)', borderColor: 'var(--fg-border)' }}
+                  data-testid={`audit-filter-${f.v || 'all'}`}>{f.l}</button>
+              ))}
+            </div>
+            {loading ? <Skeleton /> : auditLog.length === 0 ? (
+              <EmptyState text="No audit entries found" />
+            ) : (
+              <div className="space-y-2">
+                <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>{auditLog.length} entries</span>
+                {auditLog.map((entry: any) => {
+                  const actionColors: Record<string, { bg: string; color: string }> = {
+                    'delete': { bg: 'var(--fg-red-pale)', color: 'var(--fg-red)' },
+                    'bulk_delete': { bg: 'var(--fg-red-pale)', color: 'var(--fg-red)' },
+                    'bulk_status_change': { bg: 'var(--fg-green-pale)', color: 'var(--fg-green)' },
+                  }
+                  const ac = actionColors[entry.action] || { bg: 'var(--fg-surface)', color: 'var(--fg-muted)' }
+                  return (
+                    <div key={entry.id} className="bg-white border rounded-xl px-4 py-3" style={{ borderColor: 'var(--fg-border)' }} data-testid={`audit-${entry.id}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded capitalize"
+                              style={{ background: ac.bg, color: ac.color }}>
+                              {entry.action.replace(/_/g, ' ')}
+                            </span>
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border capitalize"
+                              style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                              {entry.entity_type}
+                            </span>
+                            <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>
+                              {entry.entity_count} item{entry.entity_count !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="font-mono text-[10px] font-semibold" style={{ color: 'var(--fg-text)' }}>
+                              {entry.admin_email || 'Unknown admin'}
+                            </span>
+                            <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>
+                              {timeAgo(entry.created_at)}
+                            </span>
+                          </div>
+                          {entry.details && Object.keys(entry.details).length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {Object.entries(entry.details).map(([k, v]) => (
+                                <span key={k} className="font-mono text-[9px] px-2 py-0.5 rounded border"
+                                  style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>
+                                  {k}: {String(v)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {entry.entity_ids?.length > 0 && entry.entity_ids.length <= 5 && (
+                            <div className="font-mono text-[9px] mt-1" style={{ color: 'var(--fg-muted)' }}>
+                              IDs: {entry.entity_ids.map((id: string) => id.slice(0, 8)).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-mono text-[9px] whitespace-nowrap flex-shrink-0" style={{ color: 'var(--fg-muted)' }}>
+                          {new Date(entry.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </>
         )}
       </div>
