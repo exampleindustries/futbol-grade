@@ -563,6 +563,23 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  app.post("/api/admin/listings/bulk", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { ids, status } = req.body;
+      if (!ids?.length || !status) return res.status(400).json({ error: "ids array and status required" });
+      if (status === "delete") {
+        const { error } = await supabase.from("listings").delete().in("id", ids);
+        if (error) return res.status(400).json({ error: error.message });
+      } else {
+        const { error } = await supabase.from("listings").update({ status, approved_at: new Date().toISOString() }).in("id", ids);
+        if (error) return res.status(400).json({ error: error.message });
+      }
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   // ── Coach Claims ────────────────────────────────────────────
 
   const claimLimiter = rateLimit({
@@ -674,11 +691,14 @@ export async function registerRoutes(
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
       const { ids, status } = req.body;
-      if (!ids?.length || !["approved", "rejected"].includes(status)) {
-        return res.status(400).json({ error: "ids array and status required" });
+      if (!ids?.length || !status) return res.status(400).json({ error: "ids array and status required" });
+      if (status === "delete") {
+        const { error } = await supabase.from("coaches").delete().in("id", ids);
+        if (error) return res.status(400).json({ error: error.message });
+      } else {
+        const { error } = await supabase.from("coaches").update({ status }).in("id", ids);
+        if (error) return res.status(400).json({ error: error.message });
       }
-      const { error } = await supabase.from("coaches").update({ status }).in("id", ids);
-      if (error) return res.status(400).json({ error: error.message });
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
@@ -800,6 +820,18 @@ export async function registerRoutes(
       for (const k of allowed) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
       if (!Object.keys(updates).length) return res.status(400).json({ error: "No valid fields" });
       const { error } = await supabase.from("clubs").update(updates).eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.post("/api/admin/clubs/bulk", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { ids, status } = req.body;
+      if (!ids?.length || !status) return res.status(400).json({ error: "ids array and status required" });
+      const { error } = await supabase.from("clubs").update({ status }).in("id", ids);
       if (error) return res.status(400).json({ error: error.message });
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }

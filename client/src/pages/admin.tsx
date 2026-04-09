@@ -126,6 +126,9 @@ export default function Admin() {
   const [clubEdits, setClubEdits] = useState<Record<string, any>>({})
   const [editingListing, setEditingListing] = useState<string | null>(null)
   const [listingEdits, setListingEdits] = useState<Record<string, any>>({})
+  const [selectedCoaches, setSelectedCoaches] = useState<Set<string>>(new Set())
+  const [selectedClubs, setSelectedClubs] = useState<Set<string>>(new Set())
+  const [selectedListings, setSelectedListings] = useState<Set<string>>(new Set())
   const [allCoaches, setAllCoaches] = useState<(Coach & { club?: { id: string; name: string; city: string } | null })[]>([])
   const [coachSearch, setCoachSearch] = useState('')
   const [editingCoach, setEditingCoach] = useState<string | null>(null)
@@ -357,6 +360,67 @@ export default function Admin() {
       await fetchAllCoaches()
     } catch { /* ignore */ }
     setActionLoading(null)
+  }
+
+  async function handleBulkCoaches(status: string) {
+    if (!selectedCoaches.size) return
+    setActionLoading('bulk-coaches')
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/coaches/bulk`, {
+        method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedCoaches), status }),
+      })
+      setSelectedCoaches(new Set())
+      await fetchAllCoaches()
+      await fetchStats()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  async function handleBulkClubs(status: string) {
+    if (!selectedClubs.size) return
+    setActionLoading('bulk-clubs')
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/clubs/bulk`, {
+        method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedClubs), status }),
+      })
+      setSelectedClubs(new Set())
+      await fetchClubs()
+      await fetchStats()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  async function handleBulkListings(status: string) {
+    if (!selectedListings.size) return
+    setActionLoading('bulk-listings')
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/listings/bulk`, {
+        method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedListings), status }),
+      })
+      setSelectedListings(new Set())
+      await fetchListings(listingFilter)
+      await fetchStats()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  function toggleSelection(set: Set<string>, setFn: (s: Set<string>) => void, id: string) {
+    const next = new Set(set)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setFn(next)
+  }
+
+  function toggleAllSelection(set: Set<string>, setFn: (s: Set<string>) => void, ids: string[]) {
+    const allSelected = ids.every(id => set.has(id))
+    const next = new Set(set)
+    ids.forEach(id => allSelected ? next.delete(id) : next.add(id))
+    setFn(next)
   }
 
   function startCoachEdit(c: any) {
@@ -642,12 +706,25 @@ export default function Admin() {
               value={listingFilter}
               onChange={setListingFilter}
             />
+            <BulkToolbar count={selectedListings.size} loading={actionLoading === 'bulk-listings'} actions={[
+              { label: 'Approve', color: 'green', onClick: () => handleBulkListings('active') },
+              { label: 'Remove', color: 'amber', onClick: () => handleBulkListings('removed') },
+              { label: 'Delete', color: 'red', onClick: () => handleBulkListings('delete') },
+            ]} />
             {loading ? <Skeleton /> : listings.length === 0 ? (
               <EmptyState text={`No ${listingFilter} listings`} />
             ) : (
               <div className="space-y-3">
+                {listings.length > 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 rounded"
+                      checked={listings.length > 0 && listings.every(l => selectedListings.has(l.id))}
+                      onChange={() => toggleAllSelection(selectedListings, setSelectedListings, listings.map(l => l.id))} />
+                    <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all</span>
+                  </label>
+                )}
                 {listings.map(l => (
-                  <div key={l.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-listing-${l.id}`}>
+                  <div key={l.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: selectedListings.has(l.id) ? 'var(--fg-green)' : 'var(--fg-border)' }} data-testid={`admin-listing-${l.id}`}>
                     {editingListing === l.id ? (
                       /* ── Edit mode ── */
                       <div className="p-4 space-y-3">
@@ -712,6 +789,9 @@ export default function Admin() {
                     ) : (
                       /* ── View mode ── */
                       <div className="flex items-center gap-4 p-4 sm:p-5">
+                        <input type="checkbox" className="w-4 h-4 rounded flex-shrink-0"
+                          checked={selectedListings.has(l.id)}
+                          onChange={() => toggleSelection(selectedListings, setSelectedListings, l.id)} />
                         {l.image_urls?.[0] && (
                           <img src={l.image_urls[0]} alt={l.title} className="w-14 h-14 rounded-xl object-cover border flex-shrink-0" style={{ borderColor: 'var(--fg-border)' }} />
                         )}
@@ -835,12 +915,24 @@ export default function Admin() {
         {/* Clubs tab */}
         {tab === 'clubs' && (
           <>
+            <BulkToolbar count={selectedClubs.size} loading={actionLoading === 'bulk-clubs'} actions={[
+              { label: 'Approve', color: 'green', onClick: () => handleBulkClubs('approved') },
+              { label: 'Reject', color: 'amber', onClick: () => handleBulkClubs('rejected') },
+            ]} />
             {loading ? <Skeleton /> : adminClubs.length === 0 ? (
               <EmptyState text="No clubs found" />
             ) : (
               <div className="space-y-3">
+                {adminClubs.length > 0 && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 rounded"
+                      checked={adminClubs.length > 0 && adminClubs.every(c => selectedClubs.has(c.id))}
+                      onChange={() => toggleAllSelection(selectedClubs, setSelectedClubs, adminClubs.map(c => c.id))} />
+                    <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all</span>
+                  </label>
+                )}
                 {adminClubs.map(c => (
-                  <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-club-${c.id}`}>
+                  <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: selectedClubs.has(c.id) ? 'var(--fg-green)' : 'var(--fg-border)' }} data-testid={`admin-club-${c.id}`}>
                     {editingClub === c.id ? (
                       /* ── Edit mode ── */
                       <div className="p-4 space-y-3">
@@ -945,6 +1037,9 @@ export default function Admin() {
                     ) : (
                       /* ── View mode ── */
                       <div className="flex items-center gap-4 p-4 sm:p-5">
+                        <input type="checkbox" className="w-4 h-4 rounded flex-shrink-0"
+                          checked={selectedClubs.has(c.id)}
+                          onChange={() => toggleSelection(selectedClubs, setSelectedClubs, c.id)} />
                         <div className="flex-shrink-0">
                           {c.logo_url ? (
                             <img src={c.logo_url} alt={c.name} className="w-14 h-14 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
@@ -1290,6 +1385,11 @@ export default function Admin() {
                 style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }}
                 data-testid="coach-admin-search" />
             </div>
+            <BulkToolbar count={selectedCoaches.size} loading={actionLoading === 'bulk-coaches'} actions={[
+              { label: 'Approve', color: 'green', onClick: () => handleBulkCoaches('approved') },
+              { label: 'Reject', color: 'amber', onClick: () => handleBulkCoaches('rejected') },
+              { label: 'Delete', color: 'red', onClick: () => handleBulkCoaches('delete') },
+            ]} />
             {loading ? <Skeleton /> : (() => {
               const filtered = allCoaches.filter(c => {
                 if (!coachSearch.trim()) return true
@@ -1300,9 +1400,14 @@ export default function Admin() {
                 <EmptyState text="No coaches found" />
               ) : (
                 <div className="space-y-2">
-                  <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>{filtered.length} coaches</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 rounded"
+                      checked={filtered.length > 0 && filtered.every(c => selectedCoaches.has(c.id))}
+                      onChange={() => toggleAllSelection(selectedCoaches, setSelectedCoaches, filtered.map(c => c.id))} />
+                    <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all ({filtered.length})</span>
+                  </label>
                   {filtered.map(c => (
-                    <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-coach-${c.id}`}>
+                    <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: selectedCoaches.has(c.id) ? 'var(--fg-green)' : 'var(--fg-border)' }} data-testid={`admin-coach-${c.id}`}>
                       {editingCoach === c.id ? (
                         /* ── Edit mode ── */
                         <div className="p-4 space-y-3">
@@ -1409,6 +1514,9 @@ export default function Admin() {
                       ) : (
                         /* ── View mode ── */
                         <div className="flex items-center gap-3 px-4 py-3">
+                          <input type="checkbox" className="w-4 h-4 rounded flex-shrink-0"
+                            checked={selectedCoaches.has(c.id)}
+                            onChange={() => toggleSelection(selectedCoaches, setSelectedCoaches, c.id)} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{c.first_name} {c.last_name}</span>
@@ -1487,6 +1595,27 @@ function ActionBtn({ label, color, loading, onClick }: { label: string; color: '
       data-testid={`action-${label.toLowerCase()}`}>
       {loading ? '...' : label}
     </button>
+  )
+}
+
+function BulkToolbar({ count, actions, loading }: { count: number; actions: { label: string; color: 'green' | 'amber' | 'red'; onClick: () => void }[]; loading: boolean }) {
+  if (count === 0) return null
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl mb-3 border"
+      style={{ background: 'var(--fg-green-pale)', borderColor: 'rgba(26,110,56,.2)' }}>
+      <input type="checkbox" checked readOnly className="w-4 h-4 rounded" />
+      <span className="font-mono text-[11px] font-bold" style={{ color: 'var(--fg-text)' }}>{count} selected</span>
+      <div className="flex gap-2 ml-auto">
+        {actions.map(a => (
+          <button key={a.label} onClick={a.onClick} disabled={loading}
+            className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+            style={{ background: a.color === 'green' ? 'var(--fg-green)' : a.color === 'amber' ? '#f59e0b' : 'var(--fg-red)', color: 'white' }}
+            data-testid={`bulk-${a.label.toLowerCase().replace(/\s/g, '-')}`}>
+            {loading ? '...' : a.label}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 
