@@ -5,15 +5,17 @@ import { RatingBadge } from '@/components/ui/RatingBadge'
 import { apiRequest } from '@/lib/queryClient'
 import { supabase } from '@/lib/supabase'
 import { timeAgo, fullName } from '@/lib/fg-utils'
-import type { Review, Listing } from '@/lib/types'
+import type { Review, Listing, CoachClaim } from '@/lib/types'
 
-type Tab = 'reviews' | 'listings'
+type Tab = 'reviews' | 'listings' | 'claims'
 type ReviewFilter = 'pending' | 'approved' | 'rejected'
 type ListingFilter = 'pending' | 'active' | 'removed'
+type ClaimFilter = 'pending' | 'approved' | 'rejected'
 
 interface Stats {
   reviews: { pending: number; approved: number; rejected: number }
   listings: { pending: number; active: number }
+  claims: { pending: number }
 }
 
 export default function Admin() {
@@ -21,8 +23,10 @@ export default function Admin() {
   const [tab, setTab] = useState<Tab>('reviews')
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('pending')
   const [listingFilter, setListingFilter] = useState<ListingFilter>('pending')
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>('pending')
   const [reviews, setReviews] = useState<(Review & { coach?: { id: string; first_name: string; last_name: string } })[]>([])
   const [listings, setListings] = useState<Listing[]>([])
+  const [claims, setClaims] = useState<CoachClaim[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -60,9 +64,20 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchClaims = useCallback(async (status: ClaimFilter) => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`${getApiBase()}/api/admin/claims?status=${status}`, { headers: { Authorization: auth } })
+      if (res.ok) setClaims(await res.json())
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   useEffect(() => { if (profile?.is_admin) fetchStats() }, [profile, fetchStats])
   useEffect(() => { if (profile?.is_admin && tab === 'reviews') fetchReviews(reviewFilter) }, [profile, tab, reviewFilter, fetchReviews])
   useEffect(() => { if (profile?.is_admin && tab === 'listings') fetchListings(listingFilter) }, [profile, tab, listingFilter, fetchListings])
+  useEffect(() => { if (profile?.is_admin && tab === 'claims') fetchClaims(claimFilter) }, [profile, tab, claimFilter, fetchClaims])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
     setActionLoading(id)
@@ -77,6 +92,24 @@ export default function Admin() {
         })
       }
       await fetchReviews(reviewFilter)
+      await fetchStats()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  async function handleClaimAction(id: string, action: 'approved' | 'rejected' | 'delete') {
+    setActionLoading(id)
+    try {
+      const auth = await getAuthHeader()
+      if (action === 'delete') {
+        await fetch(`${getApiBase()}/api/admin/claims/${id}`, { method: 'DELETE', headers: { Authorization: auth } })
+      } else {
+        await fetch(`${getApiBase()}/api/admin/claims/${id}`, {
+          method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: action }),
+        })
+      }
+      await fetchClaims(claimFilter)
       await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
@@ -139,26 +172,30 @@ export default function Admin() {
 
         {/* Stats row */}
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             <StatCard label="Pending Reviews" value={stats.reviews.pending} accent />
             <StatCard label="Approved Reviews" value={stats.reviews.approved} />
             <StatCard label="Pending Listings" value={stats.listings.pending} accent />
             <StatCard label="Active Listings" value={stats.listings.active} />
+            <StatCard label="Pending Claims" value={stats.claims.pending} accent />
           </div>
         )}
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings'] as Tab[]).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
-              style={tab === t
-                ? { background: 'var(--fg-green)', color: 'white', borderColor: 'var(--fg-green)' }
-                : { background: 'var(--fg-surface)', color: 'var(--fg-text2)', borderColor: 'var(--fg-border2)' }}
-              data-testid={`admin-tab-${t}`}>
-              {t} {stats ? `(${t === 'reviews' ? stats.reviews.pending : stats.listings.pending})` : ''}
-            </button>
-          ))}
+          {(['reviews', 'listings', 'claims'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : stats.claims.pending) : 0
+            return (
+              <button key={t} onClick={() => setTab(t)}
+                className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
+                style={tab === t
+                  ? { background: 'var(--fg-green)', color: 'white', borderColor: 'var(--fg-green)' }
+                  : { background: 'var(--fg-surface)', color: 'var(--fg-text2)', borderColor: 'var(--fg-border2)' }}
+                data-testid={`admin-tab-${t}`}>
+                {t} {stats ? `(${count})` : ''}
+              </button>
+            )
+          })}
         </div>
 
         {/* Reviews tab */}
@@ -291,6 +328,82 @@ export default function Admin() {
                         <ActionBtn label="Remove" color="amber" loading={actionLoading === l.id} onClick={() => handleListingAction(l.id, 'removed')} />
                       )}
                       <ActionBtn label="Delete" color="red" loading={actionLoading === l.id} onClick={() => handleListingAction(l.id, 'delete')} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Claims tab */}
+        {tab === 'claims' && (
+          <>
+            <FilterBar<ClaimFilter>
+              options={[
+                { value: 'pending', label: 'Pending' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+              ]}
+              value={claimFilter}
+              onChange={setClaimFilter}
+            />
+            {loading ? <Skeleton /> : claims.length === 0 ? (
+              <EmptyState text={`No ${claimFilter} claims`} />
+            ) : (
+              <div className="space-y-3">
+                {claims.map(c => (
+                  <div key={c.id} className="bg-white border rounded-xl p-4 sm:p-5" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-claim-${c.id}`}>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-sm">{c.claimant?.alias_emoji || '⚽'}</span>
+                          <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>
+                            {c.claimant?.alias || 'User'}
+                          </span>
+                          <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>→ claims</span>
+                          <a href={`#/coaches/${c.coach_id}`} className="font-mono text-xs font-semibold hover:underline" style={{ color: 'var(--fg-green)' }}>
+                            {c.coach ? `${c.coach.first_name} ${c.coach.last_name}` : c.coach_id.slice(0, 8)}
+                          </a>
+                        </div>
+                        <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>
+                          {timeAgo(c.created_at)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Claim details */}
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
+                        style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                        Email: {c.email}
+                      </span>
+                      {c.phone && (
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
+                          style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                          Phone: {c.phone}
+                        </span>
+                      )}
+                      {c.license_number && (
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
+                          style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                          License: {c.license_number}
+                        </span>
+                      )}
+                    </div>
+                    {c.verification_note && (
+                      <p className="text-sm mt-2 mb-3 leading-relaxed" style={{ color: 'var(--fg-text2)' }}>{c.verification_note}</p>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-3 border-t" style={{ borderColor: 'var(--fg-border)' }}>
+                      {claimFilter !== 'approved' && (
+                        <ActionBtn label="Approve" color="green" loading={actionLoading === c.id} onClick={() => handleClaimAction(c.id, 'approved')} />
+                      )}
+                      {claimFilter !== 'rejected' && (
+                        <ActionBtn label="Reject" color="amber" loading={actionLoading === c.id} onClick={() => handleClaimAction(c.id, 'rejected')} />
+                      )}
+                      <ActionBtn label="Delete" color="red" loading={actionLoading === c.id} onClick={() => handleClaimAction(c.id, 'delete')} />
                     </div>
                   </div>
                 ))}

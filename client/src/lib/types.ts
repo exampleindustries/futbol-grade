@@ -55,7 +55,9 @@ export interface Coach {
   region: Region
   age_groups: string[]
   license: string | null
+  email: string | null
   photo_url: string | null
+  user_id: string | null
   status: ApprovalStatus
   avg_overall: number
   avg_technical: number
@@ -71,6 +73,25 @@ export interface Coach {
   updated_at: string
   // Joined
   club?: Pick<Club, 'id' | 'name' | 'logo_url'> | null
+}
+
+export type ClaimStatus = 'pending' | 'approved' | 'rejected'
+
+export interface CoachClaim {
+  id: string
+  coach_id: string
+  user_id: string
+  email: string
+  phone: string | null
+  license_number: string | null
+  verification_note: string | null
+  status: ClaimStatus
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+  // Joined
+  coach?: Pick<Coach, 'id' | 'first_name' | 'last_name'> | null
+  claimant?: Pick<Profile, 'alias' | 'alias_emoji'> | null
 }
 
 export interface Review {

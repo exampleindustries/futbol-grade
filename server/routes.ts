@@ -456,22 +456,153 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Coach Claims ────────────────────────────────────────────
+
+  const claimLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many claim requests. Please try again later." },
+  });
+
+  app.post("/api/claims", claimLimiter, async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return res.status(401).json({ error: "Not authenticated" });
+      const supabase = getSupabaseClient(authHeader);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      const { coach_id, email, phone, license_number, verification_note } = req.body;
+      if (!coach_id || !email) return res.status(400).json({ error: "coach_id and email are required" });
+
+      // Check coach exists and isn't already claimed
+      const { data: coach } = await supabase.from("coaches").select("id, user_id, first_name, last_name").eq("id", coach_id).single();
+      if (!coach) return res.status(404).json({ error: "Coach not found" });
+      if (coach.user_id) return res.status(409).json({ error: "This profile has already been claimed" });
+
+      const { data, error } = await supabase
+        .from("coach_claims")
+        .insert({ coach_id, user_id: user.id, email, phone: phone || null, license_number: license_number || null, verification_note: verification_note || null })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === "23505") return res.status(409).json({ error: "A pending claim already exists for this coach" });
+        return res.status(400).json({ error: error.message });
+      }
+
+      // Fire-and-forget admin email alert
+      sendAdminAlert("review", {
+        Type: "Coach Claim",
+        Coach: `${coach.first_name} ${coach.last_name}`,
+        Email: email,
+        License: license_number || "Not provided",
+      }).catch(() => {});
+
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // Check if user already has a pending/approved claim for a coach
+  app.get("/api/claims/mine", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) return res.status(401).json({ error: "Not authenticated" });
+      const supabase = getSupabaseClient(authHeader);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      const { data } = await supabase
+        .from("coach_claims")
+        .select("id, coach_id, status, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      return res.json(data || []);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // ── Admin: Claims ───────────────────────────────────────────
+
+  app.get("/api/admin/claims", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const status = (req.query.status as string) || "pending";
+      const { data, error } = await supabase
+        .from("coach_claims")
+        .select("*, coach:coaches(id, first_name, last_name), claimant:profiles(alias, alias_emoji)")
+        .eq("status", status)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.patch("/api/admin/claims/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      const { status } = req.body;
+      if (!status || !["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
+      }
+
+      // Fetch the claim
+      const { data: claim } = await supabase.from("coach_claims").select("*").eq("id", req.params.id).single();
+      if (!claim) return res.status(404).json({ error: "Claim not found" });
+
+      // Update claim status
+      const { error: claimError } = await supabase
+        .from("coach_claims")
+        .update({ status, reviewed_by: user!.id, reviewed_at: new Date().toISOString() })
+        .eq("id", req.params.id);
+      if (claimError) return res.status(400).json({ error: claimError.message });
+
+      // If approved, link the coach to the user and update email
+      if (status === "approved") {
+        await supabase
+          .from("coaches")
+          .update({ user_id: claim.user_id, email: claim.email })
+          .eq("id", claim.coach_id);
+      }
+
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.delete("/api/admin/claims/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { error } = await supabase.from("coach_claims").delete().eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   // ── Admin: Stats ─────────────────────────────────────────────
 
   app.get("/api/admin/stats", async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
-      const [pr, ar, rr, pl, al] = await Promise.all([
+      const [pr, ar, rr, pl, al, pc] = await Promise.all([
         supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "approved"),
         supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "rejected"),
         supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "active"),
+        supabase.from("coach_claims").select("id", { count: "exact", head: true }).eq("status", "pending"),
       ]);
       return res.json({
         reviews: { pending: pr.count || 0, approved: ar.count || 0, rejected: rr.count || 0 },
         listings: { pending: pl.count || 0, active: al.count || 0 },
+        claims: { pending: pc.count || 0 },
       });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });

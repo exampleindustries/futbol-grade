@@ -15,6 +15,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Profile from "@/pages/profile";
 import Admin from "@/pages/admin";
+import ClaimCoach from "@/pages/claim-coach";
 import NotFound from "@/pages/not-found";
 
 function AppRouter() {
@@ -24,6 +25,7 @@ function AppRouter() {
       <Route path="/coaches" component={Coaches} />
       <Route path="/coaches/:id" component={CoachDetail} />
       <Route path="/coaches/:id/review" component={WriteReview} />
+      <Route path="/coaches/:id/claim" component={ClaimCoach} />
       <Route path="/clubs" component={Clubs} />
       <Route path="/clubs/:id" component={ClubDetail} />
       <Route path="/marketplace" component={Marketplace} />

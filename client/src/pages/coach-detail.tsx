@@ -69,9 +69,18 @@ export default function CoachDetail() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-3">
-                <h1 className="font-bebas text-2xl md:text-4xl tracking-[2px] leading-tight" style={{ color: 'var(--fg-text)' }} data-testid="coach-name">
-                  {coach.first_name} {coach.last_name}
-                </h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="font-bebas text-2xl md:text-4xl tracking-[2px] leading-tight" style={{ color: 'var(--fg-text)' }} data-testid="coach-name">
+                    {coach.first_name} {coach.last_name}
+                  </h1>
+                  {coach.user_id && (
+                    <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md border"
+                      style={{ background: 'var(--fg-green-pale)', color: 'var(--fg-green)', borderColor: 'rgba(26,110,56,.2)' }}
+                      data-testid="verified-badge">
+                      ✓ VERIFIED
+                    </span>
+                  )}
+                </div>
                 <RatingBadge score={coach.avg_overall} size="xl" showGrade />
               </div>
               <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1">
@@ -102,8 +111,8 @@ export default function CoachDetail() {
           </div>
         </div>
 
-        {/* Write Review Button */}
-        <div className="mb-6">
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-3 mb-6">
           {user ? (
             <a
               href={`#/coaches/${coach.id}/review`}
@@ -121,6 +130,16 @@ export default function CoachDetail() {
               data-testid="login-to-review-btn"
             >
               Log in to Write a Review
+            </a>
+          )}
+          {!coach.user_id && (
+            <a
+              href={`#/coaches/${coach.id}/claim`}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border transition-all hover:brightness-95"
+              style={{ color: 'var(--fg-green)', borderColor: 'var(--fg-green)', background: 'var(--fg-green-pale)' }}
+              data-testid="claim-profile-btn"
+            >
+              🛡️ Is this you? Claim Profile
             </a>
           )}
         </div>
