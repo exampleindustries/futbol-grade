@@ -131,6 +131,7 @@ export default function Admin() {
   const [selectedListings, setSelectedListings] = useState<Set<string>>(new Set())
   const [auditLog, setAuditLog] = useState<any[]>([])
   const [auditFilter, setAuditFilter] = useState<string>('')
+  const [clubFilter, setClubFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending')
   const [allCoaches, setAllCoaches] = useState<(Coach & { club?: { id: string; name: string; city: string } | null })[]>([])
   const [coachSearch, setCoachSearch] = useState('')
   const [editingCoach, setEditingCoach] = useState<string | null>(null)
@@ -933,19 +934,34 @@ export default function Admin() {
               { label: 'Approve', color: 'green', onClick: () => handleBulkClubs('approved') },
               { label: 'Reject', color: 'amber', onClick: () => handleBulkClubs('rejected') },
             ]} />
-            {loading ? <Skeleton /> : adminClubs.length === 0 ? (
-              <EmptyState text="No clubs found" />
-            ) : (
-              <div className="space-y-3">
-                {adminClubs.length > 0 && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 rounded"
-                      checked={adminClubs.length > 0 && adminClubs.every(c => selectedClubs.has(c.id))}
-                      onChange={() => toggleAllSelection(selectedClubs, setSelectedClubs, adminClubs.map(c => c.id))} />
-                    <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all</span>
-                  </label>
-                )}
-                {adminClubs.map(c => (
+            {loading ? <Skeleton /> : (() => {
+              const pending = adminClubs.filter(c => c.status === 'pending')
+              const approved = adminClubs.filter(c => c.status === 'approved')
+              return (
+              <div className="space-y-8">
+                {/* Pending section */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>PENDING APPROVAL</span>
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#f59e0b', color: 'white' }}>{pending.length}</span>
+                    </div>
+                    {pending.length > 0 && (
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" className="w-4 h-4 rounded"
+                          checked={pending.length > 0 && pending.every(c => selectedClubs.has(c.id))}
+                          onChange={() => toggleAllSelection(selectedClubs, setSelectedClubs, pending.map(c => c.id))} />
+                        <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all ({pending.length})</span>
+                      </label>
+                    )}
+                  </div>
+                  {pending.length === 0 ? (
+                    <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                      <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>No pending clubs</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {pending.map(c => (
                   <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: selectedClubs.has(c.id) ? 'var(--fg-green)' : 'var(--fg-border)' }} data-testid={`admin-club-${c.id}`}>
                     {editingClub === c.id ? (
                       /* ── Edit mode ── */
@@ -1099,9 +1115,70 @@ export default function Admin() {
                       </div>
                     )}
                   </div>
-                ))}
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Approved section */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>APPROVED</span>
+                    <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--fg-green)', color: 'white' }}>{approved.length}</span>
+                  </div>
+                  {approved.length === 0 ? (
+                    <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                      <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>No approved clubs</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {approved.map(c => (
+                  <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: selectedClubs.has(c.id) ? 'var(--fg-green)' : 'var(--fg-border)' }} data-testid={`admin-club-approved-${c.id}`}>
+                    {editingClub === c.id ? (
+                      <div className="p-4 space-y-3">
+                        <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-green)' }}>Editing — use the pending section above for full edit form</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4 p-4 sm:p-5">
+                        <input type="checkbox" className="w-4 h-4 rounded flex-shrink-0"
+                          checked={selectedClubs.has(c.id)}
+                          onChange={() => toggleSelection(selectedClubs, setSelectedClubs, c.id)} />
+                        <div className="flex-shrink-0">
+                          {c.logo_url ? (
+                            <img src={c.logo_url} alt={c.name} className="w-14 h-14 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
+                          ) : (
+                            <div className="w-14 h-14 rounded-xl flex items-center justify-center border-2 border-dashed" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-muted)' }}>
+                              <span className="text-[10px] font-mono">No logo</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{c.name}</span>
+                            {c.abbr && <span className="font-mono text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'var(--fg-surface)', color: 'var(--fg-muted)' }}>{c.abbr}</span>}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>{c.city}, {c.state}</span>
+                            <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.coaches.length} coaches</span>
+                            {c.avg_overall > 0 && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-green)' }}>★ {c.avg_overall.toFixed(1)}</span>}
+                          </div>
+                        </div>
+                        <button onClick={() => {
+                          setEditingClub(c.id)
+                          setClubEdits({ name: c.name, abbr: c.abbr || '', city: c.city, state: c.state, status: c.status, contact_email: c.contact_email || '', website: c.website || '' })
+                        }}
+                          className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all flex-shrink-0"
+                          style={{ background: 'var(--fg-surface)', color: 'var(--fg-green)', borderColor: 'var(--fg-green)' }}>Edit</button>
+                      </div>
+                    )}
+                  </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+              )
+            })()}
           </>
         )}
 
