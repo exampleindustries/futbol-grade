@@ -4,6 +4,223 @@ import type { Coach, Club } from '@/lib/types'
 import { Nav } from '@/components/layout/Nav'
 import { ClubBadge } from '@/components/ui/ClubBadge'
 
+const API = import.meta.env.VITE_API_URL || ''
+const AGE_GROUPS = ['U6', 'U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'U19+']
+const RADIUS_OPTIONS = [5, 10, 15, 25, 50]
+
+// ── Age Group Modal ──────────────────────────────────────────
+function AgeGroupModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [ageGroup, setAgeGroup] = useState('')
+  const [gender, setGender] = useState<'boys' | 'girls' | ''>('')
+  const [results, setResults] = useState<Coach[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searched, setSearched] = useState(false)
+
+  async function handleSearch() {
+    if (!ageGroup) return
+    setLoading(true)
+    setSearched(true)
+    let query = supabase
+      .from('coaches')
+      .select('*, club:clubs(id, name, logo_url)')
+      .eq('status', 'approved')
+      .contains('age_groups', [ageGroup])
+    if (gender) query = query.eq('gender', gender)
+    query = query.order('avg_overall', { ascending: false }).limit(30)
+    const { data } = await query
+    setResults((data as Coach[]) || [])
+    setLoading(false)
+  }
+
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60" />
+      <div className="relative bg-white rounded-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-hidden flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="px-6 pt-6 pb-4 border-b" style={{ borderColor: 'var(--fg-border)' }}>
+          <div className="flex items-center justify-between">
+            <h2 className="font-bebas text-2xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>BROWSE BY AGE GROUP</h2>
+            <button onClick={onClose} className="text-xl leading-none p-1 hover:opacity-60" style={{ color: 'var(--fg-muted)' }}>&times;</button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4">
+            {AGE_GROUPS.map(ag => (
+              <button key={ag} onClick={() => setAgeGroup(ag)}
+                className="font-mono text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                style={ageGroup === ag
+                  ? { background: 'var(--fg-green)', color: 'white', borderColor: 'var(--fg-green)' }
+                  : { background: 'var(--fg-surface)', color: 'var(--fg-text2)', borderColor: 'var(--fg-border2)' }}
+                data-testid={`age-${ag}`}>{ag}</button>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3">
+            {[{ v: '' as const, l: 'All' }, { v: 'boys' as const, l: 'Boys' }, { v: 'girls' as const, l: 'Girls' }].map(g => (
+              <button key={g.l} onClick={() => setGender(g.v)}
+                className="font-mono text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                style={gender === g.v
+                  ? { background: 'var(--fg-text)', color: 'white', borderColor: 'var(--fg-text)' }
+                  : { background: 'var(--fg-surface)', color: 'var(--fg-muted)', borderColor: 'var(--fg-border2)' }}>{g.l}</button>
+            ))}
+            <button onClick={handleSearch} disabled={!ageGroup || loading}
+              className="ml-auto font-mono text-xs font-semibold px-4 py-1.5 rounded-lg text-white transition-all disabled:opacity-50"
+              style={{ background: 'var(--fg-green)' }}>Search</button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {loading ? (
+            <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+          ) : !searched ? (
+            <div className="text-center py-8">
+              <div className="text-3xl mb-2">📅</div>
+              <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Select an age group and hit Search</p>
+            </div>
+          ) : results.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-3xl mb-2">🔍</div>
+              <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>No coaches found for {ageGroup}{gender ? ` (${gender})` : ''}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {results.map(c => (
+                <a key={c.id} href={`/coaches/${c.id}`}
+                  className="flex items-center gap-3 p-3 rounded-xl border hover:shadow-md transition-all"
+                  style={{ borderColor: 'var(--fg-border)' }}>
+                  <ClubBadge clubName={(c.club as any)?.name} logoUrl={(c.club as any)?.logo_url} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate" style={{ color: 'var(--fg-text)' }}>{c.first_name} {c.last_name}</div>
+                    <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{(c.club as any)?.name || 'Independent'} · {c.city || 'SoCal'}</div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-yellow-500 text-xs">★</span>
+                    <span className="font-bebas text-lg" style={{ color: 'var(--fg-text)' }}>{c.avg_overall.toFixed(1)}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Region Modal ─────────────────────────────────────────────
+function RegionModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [locStatus, setLocStatus] = useState<'idle' | 'loading' | 'granted' | 'denied'>('idle')
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [radius, setRadius] = useState(25)
+  const [clubs, setClubs] = useState<(Club & { distance: number })[]>([])
+  const [loading, setLoading] = useState(false)
+
+  function requestLocation() {
+    setLocStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setLocStatus('granted')
+      },
+      () => setLocStatus('denied'),
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  useEffect(() => {
+    if (!coords) return
+    setLoading(true)
+    fetch(`${API}/api/clubs/nearby?lat=${coords.lat}&lng=${coords.lng}&radius=${radius}`)
+      .then(r => r.json())
+      .then(data => { setClubs(data || []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [coords, radius])
+
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60" />
+      <div className="relative bg-white rounded-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-hidden flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
+        <div className="px-6 pt-6 pb-4 border-b" style={{ borderColor: 'var(--fg-border)' }}>
+          <div className="flex items-center justify-between">
+            <h2 className="font-bebas text-2xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>CLUBS NEAR YOU</h2>
+            <button onClick={onClose} className="text-xl leading-none p-1 hover:opacity-60" style={{ color: 'var(--fg-muted)' }}>&times;</button>
+          </div>
+
+          {locStatus === 'idle' && (
+            <button onClick={requestLocation}
+              className="mt-4 w-full py-3 rounded-xl font-semibold text-sm text-white transition-all hover:brightness-110"
+              style={{ background: 'var(--fg-green)' }}
+              data-testid="share-location">
+              📍 Share My Location
+            </button>
+          )}
+          {locStatus === 'loading' && (
+            <div className="mt-4 text-center py-3">
+              <span className="font-mono text-xs" style={{ color: 'var(--fg-muted)' }}>Getting your location...</span>
+            </div>
+          )}
+          {locStatus === 'denied' && (
+            <div className="mt-4 px-4 py-3 rounded-xl border text-center"
+              style={{ borderColor: 'rgba(192,57,43,.2)', background: 'var(--fg-red-pale)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--fg-red)' }}>Location access denied</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>Enable location in your browser settings and try again</p>
+              <button onClick={requestLocation} className="mt-2 font-mono text-xs font-semibold px-4 py-1.5 rounded-lg"
+                style={{ background: 'var(--fg-surface)', color: 'var(--fg-text2)', border: '1px solid var(--fg-border2)' }}>Try Again</button>
+            </div>
+          )}
+          {locStatus === 'granted' && (
+            <div className="mt-4">
+              <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Radius (miles)</span>
+              <div className="flex gap-2 mt-2">
+                {RADIUS_OPTIONS.map(r => (
+                  <button key={r} onClick={() => setRadius(r)}
+                    className="font-mono text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                    style={radius === r
+                      ? { background: 'var(--fg-green)', color: 'white', borderColor: 'var(--fg-green)' }
+                      : { background: 'var(--fg-surface)', color: 'var(--fg-text2)', borderColor: 'var(--fg-border2)' }}
+                    data-testid={`radius-${r}`}>{r} mi</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {locStatus !== 'granted' ? (
+            <div className="text-center py-8">
+              <div className="text-3xl mb-2">📍</div>
+              <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Share your location to find nearby clubs</p>
+            </div>
+          ) : loading ? (
+            <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />)}</div>
+          ) : clubs.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-3xl mb-2">🔍</div>
+              <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>No clubs found within {radius} miles</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>Try increasing the radius</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>{clubs.length} clubs within {radius} miles (A-Z)</span>
+              {clubs.map(c => (
+                <a key={c.id} href={`/clubs/${c.id}`}
+                  className="flex items-center gap-3 p-3 rounded-xl border hover:shadow-md transition-all"
+                  style={{ borderColor: 'var(--fg-border)' }}>
+                  <ClubBadge clubName={c.name} logoUrl={c.logo_url} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate" style={{ color: 'var(--fg-text)' }}>{c.name}</div>
+                    <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{c.city}, {c.state}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bebas text-lg" style={{ color: 'var(--fg-green)' }}>{(c as any).distance} mi</div>
+                    <div className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>{c.coach_count} coaches</div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CompactCoachCard({ coach }: { coach: Coach }) {
   const [expanded, setExpanded] = useState(false)
   const scores = [
@@ -100,6 +317,8 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const carouselRef = useRef<HTMLDivElement>(null)
+  const [showAgeModal, setShowAgeModal] = useState(false)
+  const [showRegionModal, setShowRegionModal] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -207,6 +426,9 @@ export default function Home() {
         </div>
       </section>
 
+      <AgeGroupModal open={showAgeModal} onClose={() => setShowAgeModal(false)} />
+      <RegionModal open={showRegionModal} onClose={() => setShowRegionModal(false)} />
+
       {/* Browse Categories — Dark Section */}
       <section style={{ background: '#1a3c24' }}>
         <div className="max-w-6xl mx-auto px-6 py-16">
@@ -215,21 +437,38 @@ export default function Home() {
             <h2 className="font-bebas text-3xl tracking-[2px] mt-1 text-white">BROWSE BY CATEGORY</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {[
-              { icon: '\u26bd', title: 'Clubs', desc: 'All SoCal youth soccer clubs ranked by community ratings', href: '/clubs' },
-              { icon: '\ud83d\udcc5', title: 'By Age Group', desc: 'Find coaches for U8, U10, U12, U14, U16, and U18 teams', href: '/coaches' },
-              { icon: '\ud83d\udccd', title: 'By Region', desc: 'San Diego, LA, Orange County, Inland Empire, and more', href: '/coaches' },
-              { icon: '\ud83c\udfc6', title: 'Events & Programs', desc: 'Camps, clinics, tournaments, and training programs', href: '/events' },
-            ].map(cat => (
-              <a key={cat.title} href={cat.href}
-                className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg"
-                style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(74,222,128,0.15)' }}
-                data-testid={`category-${cat.title.toLowerCase().replace(/[^a-z]/g, '-')}`}>
-                <div className="text-3xl mb-3">{cat.icon}</div>
-                <h3 className="font-bebas text-xl tracking-[1px] text-white mb-1 group-hover:text-green-400 transition-colors">{cat.title.toUpperCase()}</h3>
-                <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>{cat.desc}</p>
-              </a>
-            ))}
+            <a href="/clubs"
+              className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg cursor-pointer"
+              style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(74,222,128,0.15)' }}
+              data-testid="category-clubs">
+              <div className="text-3xl mb-3">⚽</div>
+              <h3 className="font-bebas text-xl tracking-[1px] text-white mb-1 group-hover:text-green-400 transition-colors">CLUBS</h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>All SoCal youth soccer clubs ranked by community ratings</p>
+            </a>
+            <button onClick={() => setShowAgeModal(true)}
+              className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg cursor-pointer text-left"
+              style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(74,222,128,0.15)' }}
+              data-testid="category-by-age-group">
+              <div className="text-3xl mb-3">📅</div>
+              <h3 className="font-bebas text-xl tracking-[1px] text-white mb-1 group-hover:text-green-400 transition-colors">BY AGE GROUP</h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>Find coaches for U8, U10, U12, U14, U16, and U18 teams</p>
+            </button>
+            <button onClick={() => setShowRegionModal(true)}
+              className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg cursor-pointer text-left"
+              style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(74,222,128,0.15)' }}
+              data-testid="category-by-region">
+              <div className="text-3xl mb-3">📍</div>
+              <h3 className="font-bebas text-xl tracking-[1px] text-white mb-1 group-hover:text-green-400 transition-colors">BY REGION</h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>Share your location to find clubs near you</p>
+            </button>
+            <a href="/events"
+              className="group rounded-2xl p-6 border transition-all hover:scale-[1.02] hover:shadow-lg cursor-pointer"
+              style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(74,222,128,0.15)' }}
+              data-testid="category-events">
+              <div className="text-3xl mb-3">🏆</div>
+              <h3 className="font-bebas text-xl tracking-[1px] text-white mb-1 group-hover:text-green-400 transition-colors">EVENTS & PROGRAMS</h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.5)' }}>Camps, clinics, tournaments, and training programs</p>
+            </a>
           </div>
         </div>
       </section>

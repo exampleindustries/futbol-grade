@@ -841,6 +841,41 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Nearby clubs (public, geo-search) ─────────────────
+
+  app.get("/api/clubs/nearby", async (req, res) => {
+    try {
+      const lat = parseFloat(req.query.lat as string);
+      const lng = parseFloat(req.query.lng as string);
+      const radius = Math.min(parseFloat(req.query.radius as string) || 25, 100); // miles, max 100
+      if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: "lat and lng required" });
+
+      const supabase = getSupabaseClient();
+      const { data: clubs, error } = await supabase
+        .from("clubs")
+        .select("id, name, city, state, logo_url, lat, lng, avg_overall, coach_count")
+        .eq("status", "approved")
+        .not("lat", "is", null);
+      if (error) return res.status(400).json({ error: error.message });
+
+      // Haversine distance in miles
+      function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
+        const R = 3959;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      const nearby = (clubs || [])
+        .map((c: any) => ({ ...c, distance: Math.round(haversine(lat, lng, c.lat, c.lng) * 10) / 10 }))
+        .filter((c: any) => c.distance <= radius)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name)); // alphabetical
+
+      return res.json(nearby);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   // ── Events (public) ─────────────────────────────────────────
 
   app.get("/api/events", async (req, res) => {
