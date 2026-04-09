@@ -629,6 +629,62 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Admin: Coach Imports ─────────────────────────────────
+
+  app.get("/api/admin/coaches", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const status = (req.query.status as string) || "pending";
+      const { data, error } = await supabase
+        .from("coaches")
+        .select("*, club:clubs(id, name, city)")
+        .eq("status", status)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.patch("/api/admin/coaches/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { status } = req.body;
+      if (!status || !["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
+      }
+      const { error } = await supabase.from("coaches").update({ status }).eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.post("/api/admin/coaches/bulk", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { ids, status } = req.body;
+      if (!ids?.length || !["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "ids array and status required" });
+      }
+      const { error } = await supabase.from("coaches").update({ status }).in("id", ids);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  app.delete("/api/admin/coaches/:id", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const { error } = await supabase.from("coaches").delete().eq("id", req.params.id);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   // ── Admin: Claims ───────────────────────────────────────────
 
   app.get("/api/admin/claims", async (req, res) => {
@@ -704,18 +760,20 @@ export async function registerRoutes(
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
-      const [pr, ar, rr, pl, al, pc] = await Promise.all([
+      const [pr, ar, rr, pl, al, pc, pci] = await Promise.all([
         supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "approved"),
         supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "rejected"),
         supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "active"),
         supabase.from("coach_claims").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("coaches").select("id", { count: "exact", head: true }).eq("status", "pending"),
       ]);
       return res.json({
         reviews: { pending: pr.count || 0, approved: ar.count || 0, rejected: rr.count || 0 },
         listings: { pending: pl.count || 0, active: al.count || 0 },
         claims: { pending: pc.count || 0 },
+        imports: { pending: pci.count || 0 },
       });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });

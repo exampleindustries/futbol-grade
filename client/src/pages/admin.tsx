@@ -5,7 +5,7 @@ import { RatingBadge } from '@/components/ui/RatingBadge'
 import { apiRequest } from '@/lib/queryClient'
 import { supabase } from '@/lib/supabase'
 import { timeAgo, fullName } from '@/lib/fg-utils'
-import type { Review, Listing, CoachClaim } from '@/lib/types'
+import type { Review, Listing, CoachClaim, Coach } from '@/lib/types'
 
 function AdminLoginForm() {
   const [email, setEmail] = useState('')
@@ -61,15 +61,18 @@ function AdminLoginForm() {
   )
 }
 
-type Tab = 'reviews' | 'listings' | 'claims'
+type Tab = 'reviews' | 'listings' | 'claims' | 'imports'
 type ReviewFilter = 'pending' | 'approved' | 'rejected'
 type ListingFilter = 'pending' | 'active' | 'removed'
 type ClaimFilter = 'pending' | 'approved' | 'rejected'
+
+type ImportFilter = 'pending' | 'approved' | 'rejected'
 
 interface Stats {
   reviews: { pending: number; approved: number; rejected: number }
   listings: { pending: number; active: number }
   claims: { pending: number }
+  imports: { pending: number }
 }
 
 export default function Admin() {
@@ -81,9 +84,12 @@ export default function Admin() {
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('pending')
   const [listingFilter, setListingFilter] = useState<ListingFilter>('pending')
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('pending')
+  const [importFilter, setImportFilter] = useState<ImportFilter>('pending')
   const [reviews, setReviews] = useState<(Review & { coach?: { id: string; first_name: string; last_name: string } })[]>([])
   const [listings, setListings] = useState<Listing[]>([])
   const [claims, setClaims] = useState<CoachClaim[]>([])
+  const [imports, setImports] = useState<(Coach & { club?: { id: string; name: string; city: string } })[]>([])
+  const [selectedImports, setSelectedImports] = useState<Set<string>>(new Set())
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -131,10 +137,21 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchImports = useCallback(async (status: ImportFilter) => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`${getApiBase()}/api/admin/coaches?status=${status}`, { headers: { Authorization: auth } })
+      if (res.ok) { setImports(await res.json()); setSelectedImports(new Set()) }
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   useEffect(() => { if (profile?.is_admin) fetchStats() }, [profile, fetchStats])
   useEffect(() => { if (profile?.is_admin && tab === 'reviews') fetchReviews(reviewFilter) }, [profile, tab, reviewFilter, fetchReviews])
   useEffect(() => { if (profile?.is_admin && tab === 'listings') fetchListings(listingFilter) }, [profile, tab, listingFilter, fetchListings])
   useEffect(() => { if (profile?.is_admin && tab === 'claims') fetchClaims(claimFilter) }, [profile, tab, claimFilter, fetchClaims])
+  useEffect(() => { if (profile?.is_admin && tab === 'imports') fetchImports(importFilter) }, [profile, tab, importFilter, fetchImports])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
     setActionLoading(id)
@@ -152,6 +169,56 @@ export default function Admin() {
       await fetchStats()
     } catch { /* ignore */ }
     setActionLoading(null)
+  }
+
+  async function handleImportAction(id: string, action: 'approved' | 'rejected' | 'delete') {
+    setActionLoading(id)
+    try {
+      const auth = await getAuthHeader()
+      if (action === 'delete') {
+        await fetch(`${getApiBase()}/api/admin/coaches/${id}`, { method: 'DELETE', headers: { Authorization: auth } })
+      } else {
+        await fetch(`${getApiBase()}/api/admin/coaches/${id}`, {
+          method: 'PATCH', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: action }),
+        })
+      }
+      await fetchImports(importFilter)
+      await fetchStats()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  async function handleBulkImport(action: 'approved' | 'rejected') {
+    if (!selectedImports.size) return
+    setActionLoading('bulk')
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/coaches/bulk`, {
+        method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedImports), status: action }),
+      })
+      await fetchImports(importFilter)
+      await fetchStats()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  function toggleImportSelect(id: string) {
+    setSelectedImports(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllImports(clubCoaches: typeof imports) {
+    const allSelected = clubCoaches.every(c => selectedImports.has(c.id))
+    setSelectedImports(prev => {
+      const next = new Set(prev)
+      clubCoaches.forEach(c => allSelected ? next.delete(c.id) : next.add(c.id))
+      return next
+    })
   }
 
   async function handleClaimAction(id: string, action: 'approved' | 'rejected' | 'delete') {
@@ -251,13 +318,14 @@ export default function Admin() {
             <StatCard label="Pending Listings" value={stats.listings.pending} accent />
             <StatCard label="Active Listings" value={stats.listings.active} />
             <StatCard label="Pending Claims" value={stats.claims.pending} accent />
+            <StatCard label="Pending Imports" value={stats.imports.pending} accent />
           </div>
         )}
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings', 'claims'] as Tab[]).map(t => {
-            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : stats.claims.pending) : 0
+          {(['reviews', 'listings', 'claims', 'imports'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : stats.imports.pending) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
                 className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
@@ -477,6 +545,125 @@ export default function Admin() {
                         <ActionBtn label="Reject" color="amber" loading={actionLoading === c.id} onClick={() => handleClaimAction(c.id, 'rejected')} />
                       )}
                       <ActionBtn label="Delete" color="red" loading={actionLoading === c.id} onClick={() => handleClaimAction(c.id, 'delete')} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {/* Imports tab */}
+        {tab === 'imports' && (
+          <>
+            <FilterBar<ImportFilter>
+              options={[
+                { value: 'pending', label: 'Pending' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+              ]}
+              value={importFilter}
+              onChange={setImportFilter}
+            />
+
+            {importFilter === 'pending' && imports.length > 0 && (
+              <div className="flex gap-2 mb-4">
+                <span className="font-mono text-[10px] py-2" style={{ color: 'var(--fg-muted)' }}>
+                  {selectedImports.size} selected
+                </span>
+                <ActionBtn label={`Approve ${selectedImports.size}`} color="green" loading={actionLoading === 'bulk'}
+                  onClick={() => handleBulkImport('approved')} />
+                <ActionBtn label={`Reject ${selectedImports.size}`} color="amber" loading={actionLoading === 'bulk'}
+                  onClick={() => handleBulkImport('rejected')} />
+              </div>
+            )}
+
+            {loading ? <Skeleton /> : imports.length === 0 ? (
+              <EmptyState text={`No ${importFilter} coach imports`} />
+            ) : (
+              <div className="space-y-6">
+                {/* Group by club */}
+                {Object.entries(
+                  imports.reduce<Record<string, typeof imports>>((acc, c) => {
+                    const clubName = c.club ? `${c.club.name} — ${c.club.city}` : 'No Club'
+                    if (!acc[clubName]) acc[clubName] = []
+                    acc[clubName].push(c)
+                    return acc
+                  }, {})
+                ).map(([clubName, clubCoaches]) => (
+                  <div key={clubName} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }}>
+                    {/* Club header */}
+                    <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b" style={{ borderColor: 'var(--fg-border)', background: 'var(--fg-green-pale)' }}>
+                      <div className="flex items-center gap-3">
+                        {importFilter === 'pending' && (
+                          <input type="checkbox"
+                            checked={clubCoaches.every(c => selectedImports.has(c.id))}
+                            onChange={() => toggleAllImports(clubCoaches)}
+                            className="w-4 h-4 rounded" />
+                        )}
+                        <div>
+                          <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{clubName}</span>
+                          <span className="font-mono text-[10px] ml-2" style={{ color: 'var(--fg-muted)' }}>{clubCoaches.length} coach{clubCoaches.length !== 1 ? 'es' : ''}</span>
+                        </div>
+                      </div>
+                      {importFilter === 'pending' && (
+                        <div className="flex gap-2">
+                          <button onClick={() => {
+                            const ids = clubCoaches.map(c => c.id)
+                            setSelectedImports(prev => { const n = new Set(prev); ids.forEach(id => n.add(id)); return n })
+                            handleBulkImport('approved')
+                          }} className="font-mono text-[10px] font-bold px-3 py-1 rounded-lg" style={{ color: 'var(--fg-green)', background: 'rgba(26,110,56,.1)' }}>
+                            Approve All
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Coach rows */}
+                    <div className="divide-y" style={{ borderColor: 'var(--fg-border)' }}>
+                      {clubCoaches.map(c => (
+                        <div key={c.id} className="flex items-center gap-3 px-4 sm:px-5 py-3" data-testid={`import-coach-${c.id}`}>
+                          {importFilter === 'pending' && (
+                            <input type="checkbox"
+                              checked={selectedImports.has(c.id)}
+                              onChange={() => toggleImportSelect(c.id)}
+                              className="w-4 h-4 rounded flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>
+                              {c.first_name} {c.last_name}
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {c.license && (
+                                <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
+                                  style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                                  {c.license}
+                                </span>
+                              )}
+                              {c.email && (
+                                <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
+                                  style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                                  {c.email}
+                                </span>
+                              )}
+                              {c.city && (
+                                <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
+                                  style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>
+                                  {c.city}, {c.state}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            {importFilter !== 'approved' && (
+                              <ActionBtn label="Approve" color="green" loading={actionLoading === c.id} onClick={() => handleImportAction(c.id, 'approved')} />
+                            )}
+                            {importFilter !== 'rejected' && (
+                              <ActionBtn label="Reject" color="amber" loading={actionLoading === c.id} onClick={() => handleImportAction(c.id, 'rejected')} />
+                            )}
+                            <ActionBtn label="Delete" color="red" loading={actionLoading === c.id} onClick={() => handleImportAction(c.id, 'delete')} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
