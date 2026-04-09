@@ -77,6 +77,52 @@ export default function Home() {
         </div>
       </section>
 
+      {/* How It Works */}
+      <section className="border-b" style={{ borderColor: 'var(--fg-border)', background: 'var(--fg-surface)' }}>
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <div className="text-center mb-10">
+            <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-green)' }}>For Parents &amp; Players</span>
+            <h2 className="font-bebas text-3xl tracking-[2px] mt-1" style={{ color: 'var(--fg-text)' }}>HOW IT WORKS</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                step: '01',
+                icon: '🔍',
+                title: 'Find a Coach',
+                desc: 'Browse coaches by club, city, or age group. Every SoCal youth coach has a profile with their rating breakdown.',
+              },
+              {
+                step: '02',
+                icon: '⭐',
+                title: 'Rate Honestly',
+                desc: 'Score coaches across 6 categories — technical skills, team building, development, approachability, professionalism, and dedication. All reviews are anonymous.',
+              },
+              {
+                step: '03',
+                icon: '🛡️',
+                title: 'Community Verified',
+                desc: 'Every review goes through moderation before publishing. Coaches can claim their profile, get verified, and receive email alerts on new reviews.',
+              },
+            ].map(item => (
+              <div key={item.step} className="bg-white border rounded-2xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                <div className="text-3xl mb-3">{item.icon}</div>
+                <div className="font-mono text-[10px] font-bold tracking-widest mb-2" style={{ color: 'var(--fg-green)' }}>STEP {item.step}</div>
+                <h3 className="font-bebas text-xl tracking-[1px] mb-2" style={{ color: 'var(--fg-text)' }}>{item.title}</h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--fg-muted)' }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-8">
+            <a href="/auth/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:brightness-110"
+              style={{ background: 'var(--fg-green)', boxShadow: '0 4px 16px rgba(26,110,56,.25)' }}
+              data-testid="how-it-works-cta">
+              Create Free Account
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Top Coaches */}
       <section className="max-w-6xl mx-auto px-6 py-12">
         <div className="flex items-center justify-between mb-6">
