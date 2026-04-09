@@ -26,3 +26,53 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
+
+  lighthouse:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Railway deploy
+        run: |
+          echo "Waiting 90s for Railway to build and deploy..."
+          sleep 90
+          # Verify the site is up
+          curl -sf "${{ secrets.SITE_URL }}/api/health" || curl -sf "${{ secrets.RAILWAY_PUBLIC_URL }}/api/health"
+
+      - name: Lighthouse audit
+        id: lighthouse
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            ${{ secrets.SITE_URL }}
+            ${{ secrets.SITE_URL }}/coaches
+            ${{ secrets.SITE_URL }}/auth/login
+          runs: 1
+          configPath: .github/lighthouse/lighthouserc.json
+
+      - name: Check scores
+        run: |
+          echo "Lighthouse results:"
+          echo '${{ steps.lighthouse.outputs.manifest }}' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          failed = False
+          for entry in data:
+              url = entry.get('url', 'unknown')
+              summary = entry.get('summary', {})
+              perf = int(summary.get('performance', 0) * 100)
+              a11y = int(summary.get('accessibility', 0) * 100)
+              bp = int(summary.get('best-practices', 0) * 100)
+              seo = int(summary.get('seo', 0) * 100)
+              status = '✅' if perf >= 80 else '❌'
+              print(f'{status} {url}')
+              print(f'   Performance: {perf}  Accessibility: {a11y}  Best Practices: {bp}  SEO: {seo}')
+              if perf < 80:
+                  failed = True
+                  print(f'   FAIL: Performance {perf} < 80 threshold')
+          if failed:
+              sys.exit(1)
+          print('\nAll pages passed performance threshold (>= 80)')
+          "
