@@ -158,6 +158,62 @@ async function sendCoachAlert(
   }
 }
 
+function buildClaimApprovalHtml(coachName: string, coachId: string) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;"><tr><td align="center">
+    <table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+      <tr><td style="background:#1a3c24;padding:20px 24px;">
+        <span style="color:#4ade80;font-size:20px;font-weight:700;">&#9917; Futbol Grade</span>
+      </td></tr>
+      <tr><td style="padding:24px;">
+        <h2 style="margin:0 0 8px;color:#1a3c24;font-size:18px;">Your Profile Is Verified!</h2>
+        <p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.5;">Hi ${coachName}, great news &#8212; your claim has been approved and your coaching profile is now verified. Your email is on file and you&#8217;ll receive notifications when players leave reviews.</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;margin-bottom:20px;">
+          <tr>
+            <td style="padding:12px 16px;text-align:center;">
+              <span style="font-size:24px;">&#10003;</span>
+              <div style="font-weight:700;color:#16a34a;font-size:14px;margin-top:4px;">VERIFIED COACH</div>
+              <div style="color:#6b7280;font-size:12px;margin-top:2px;">Your profile now shows a verified badge</div>
+            </td>
+          </tr>
+        </table>
+        <a href="https://exampleindustries.github.io/futbol-grade/#/coaches/${coachId}"
+           style="display:inline-block;background:#16a34a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">
+          View Your Verified Profile &#8594;
+        </a>
+      </td></tr>
+      <tr><td style="padding:16px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+        <span style="color:#9ca3af;font-size:12px;">Automated alert from Futbol Grade</span>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+}
+
+async function sendClaimApprovalEmail(coachEmail: string, coachName: string, coachId: string) {
+  if (!RESEND_API_KEY || !coachEmail) return;
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Futbol Grade <onboarding@resend.dev>",
+        to: [coachEmail],
+        subject: "Your Futbol Grade profile is now verified!",
+        html: buildClaimApprovalHtml(coachName, coachId),
+      }),
+    });
+    if (!resp.ok) console.error("Claim approval email error:", await resp.text());
+  } catch (err) {
+    console.error("Claim approval email failed:", err);
+  }
+}
+
 async function sendAdminAlert(type: "review" | "listing", details: Record<string, string>) {
   if (!RESEND_API_KEY) return;
   const subject = type === "review"
@@ -552,8 +608,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
       }
 
-      // Fetch the claim
-      const { data: claim } = await supabase.from("coach_claims").select("*").eq("id", req.params.id).single();
+      // Fetch the claim with coach details
+      const { data: claim } = await supabase
+        .from("coach_claims")
+        .select("*, coach:coaches(first_name, last_name)")
+        .eq("id", req.params.id)
+        .single();
       if (!claim) return res.status(404).json({ error: "Claim not found" });
 
       // Update claim status
@@ -569,6 +629,10 @@ export async function registerRoutes(
           .from("coaches")
           .update({ user_id: claim.user_id, email: claim.email })
           .eq("id", claim.coach_id);
+
+        // Fire-and-forget approval email to coach
+        const coachName = claim.coach ? `${claim.coach.first_name}` : "Coach";
+        sendClaimApprovalEmail(claim.email, coachName, claim.coach_id).catch(() => {});
       }
 
       return res.json({ ok: true });
