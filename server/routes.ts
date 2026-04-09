@@ -637,12 +637,13 @@ export async function registerRoutes(
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
       const status = (req.query.status as string) || "pending";
-      const { data, error } = await supabase
+      let query = supabase
         .from("coaches")
         .select("*, club:clubs(id, name, city)")
-        .eq("status", status)
-        .order("created_at", { ascending: false })
-        .limit(200);
+        .order("last_name", { ascending: true })
+        .limit(300);
+      if (status !== "all") query = query.eq("status", status);
+      const { data, error } = await query;
       if (error) return res.status(400).json({ error: error.message });
       return res.json(data);
     } catch { return res.status(500).json({ error: "Server error" }); }
@@ -652,11 +653,16 @@ export async function registerRoutes(
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
-      const { status } = req.body;
-      if (!status || !["approved", "rejected"].includes(status)) {
-        return res.status(400).json({ error: "status must be 'approved' or 'rejected'" });
+      const allowed = ["status", "first_name", "last_name", "city", "state", "club_id", "gender", "age_groups", "license", "email"];
+      const updates: Record<string, any> = {};
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) updates[key] = req.body[key];
       }
-      const { error } = await supabase.from("coaches").update({ status }).eq("id", req.params.id);
+      if (updates.status && !["approved", "rejected", "pending"].includes(updates.status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      if (!Object.keys(updates).length) return res.status(400).json({ error: "No valid fields" });
+      const { error } = await supabase.from("coaches").update(updates).eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }

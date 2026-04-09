@@ -61,7 +61,7 @@ function AdminLoginForm() {
   )
 }
 
-type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | 'events'
+type Tab = 'reviews' | 'listings' | 'claims' | 'imports' | 'users' | 'clubs' | 'events' | 'coaches'
 
 interface AdminClub {
   id: string
@@ -122,6 +122,10 @@ export default function Admin() {
   const [editName, setEditName] = useState('')
   const [editCity, setEditCity] = useState('')
   const [editState, setEditState] = useState('')
+  const [allCoaches, setAllCoaches] = useState<(Coach & { club?: { id: string; name: string; city: string } | null })[]>([])
+  const [coachSearch, setCoachSearch] = useState('')
+  const [editingCoach, setEditingCoach] = useState<string | null>(null)
+  const [coachEdits, setCoachEdits] = useState<Record<string, any>>({})
   const [adminEvents, setAdminEvents] = useState<(FGEvent & { club?: { id: string; name: string } | null })[]>([])
   const [eventFilter, setEventFilter] = useState<'pending' | 'approved' | 'rejected'>('pending')
   const [stats, setStats] = useState<Stats | null>(null)
@@ -191,6 +195,16 @@ export default function Admin() {
     setLoading(false)
   }, [])
 
+  const fetchAllCoaches = useCallback(async () => {
+    setLoading(true)
+    try {
+      const auth = await getAuthHeader()
+      const res = await fetch(`${getApiBase()}/api/admin/coaches?status=all`, { headers: { Authorization: auth } })
+      if (res.ok) setAllCoaches(await res.json())
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
   const fetchClubs = useCallback(async () => {
     setLoading(true)
     try {
@@ -220,6 +234,7 @@ export default function Admin() {
   useEffect(() => { if (profile?.is_admin && tab === 'users') fetchUsers() }, [profile, tab, fetchUsers])
   useEffect(() => { if (profile?.is_admin && tab === 'clubs') fetchClubs() }, [profile, tab, fetchClubs])
   useEffect(() => { if (profile?.is_admin && tab === 'events') fetchEvents(eventFilter) }, [profile, tab, eventFilter, fetchEvents])
+  useEffect(() => { if (profile?.is_admin && tab === 'coaches') fetchAllCoaches() }, [profile, tab, fetchAllCoaches])
 
   async function handleReviewAction(id: string, action: 'approved' | 'rejected' | 'delete') {
     setActionLoading(id)
@@ -301,6 +316,39 @@ export default function Admin() {
       await fetchUsers(userSearch || undefined)
     } catch { /* ignore */ }
     setActionLoading(null)
+  }
+
+  async function handleCoachSave(id: string) {
+    const edits = coachEdits
+    if (!Object.keys(edits).length) { setEditingCoach(null); return }
+    setActionLoading(id)
+    try {
+      const auth = await getAuthHeader()
+      await fetch(`${getApiBase()}/api/admin/coaches/${id}`, {
+        method: 'PATCH',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify(edits),
+      })
+      setEditingCoach(null)
+      setCoachEdits({})
+      await fetchAllCoaches()
+    } catch { /* ignore */ }
+    setActionLoading(null)
+  }
+
+  function startCoachEdit(c: any) {
+    setEditingCoach(c.id)
+    setCoachEdits({
+      first_name: c.first_name,
+      last_name: c.last_name,
+      city: c.city || '',
+      state: c.state || '',
+      gender: c.gender || 'coed',
+      age_groups: c.age_groups || [],
+      club_id: c.club_id || '',
+      license: c.license || '',
+      email: c.email || '',
+    })
   }
 
   async function handleEventAction(id: string, action: 'approved' | 'rejected' | 'delete') {
@@ -457,8 +505,8 @@ export default function Admin() {
 
         {/* Tab bar */}
         <div className="flex gap-2 mb-6">
-          {(['reviews', 'listings', 'claims', 'imports', 'events', 'users', 'clubs'] as Tab[]).map(t => {
-            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'users' ? users.length : adminClubs.length) : 0
+          {(['reviews', 'listings', 'claims', 'imports', 'events', 'coaches', 'users', 'clubs'] as Tab[]).map(t => {
+            const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'coaches' ? allCoaches.length : t === 'users' ? users.length : adminClubs.length) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
                 className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
@@ -1087,6 +1135,147 @@ export default function Admin() {
                 ))}
               </div>
             )}
+          </>
+        )}
+
+        {/* Coaches tab */}
+        {tab === 'coaches' && (
+          <>
+            <div className="flex gap-3 mb-4">
+              <input type="search" value={coachSearch} onChange={e => setCoachSearch(e.target.value)}
+                placeholder="Search coaches..." className="flex-1 px-4 py-2 rounded-lg text-sm border outline-none"
+                style={{ borderColor: 'var(--fg-border2)', background: 'var(--fg-surface)', color: 'var(--fg-text)' }}
+                data-testid="coach-admin-search" />
+            </div>
+            {loading ? <Skeleton /> : (() => {
+              const filtered = allCoaches.filter(c => {
+                if (!coachSearch.trim()) return true
+                const q = coachSearch.toLowerCase()
+                return c.first_name.toLowerCase().includes(q) || c.last_name.toLowerCase().includes(q) || (c.club?.name || '').toLowerCase().includes(q)
+              })
+              return filtered.length === 0 ? (
+                <EmptyState text="No coaches found" />
+              ) : (
+                <div className="space-y-2">
+                  <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>{filtered.length} coaches</span>
+                  {filtered.map(c => (
+                    <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }} data-testid={`admin-coach-${c.id}`}>
+                      {editingCoach === c.id ? (
+                        /* ── Edit mode ── */
+                        <div className="p-4 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>First Name</label>
+                              <input value={coachEdits.first_name || ''} onChange={e => setCoachEdits(p => ({ ...p, first_name: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                            </div>
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Last Name</label>
+                              <input value={coachEdits.last_name || ''} onChange={e => setCoachEdits(p => ({ ...p, last_name: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>City</label>
+                              <input value={coachEdits.city || ''} onChange={e => setCoachEdits(p => ({ ...p, city: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                            </div>
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>State</label>
+                              <input value={coachEdits.state || ''} onChange={e => setCoachEdits(p => ({ ...p, state: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Club</label>
+                              <select value={coachEdits.club_id || ''} onChange={e => setCoachEdits(p => ({ ...p, club_id: e.target.value || null }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }}>
+                                <option value="">No club</option>
+                                {adminClubs.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Gender</label>
+                              <select value={coachEdits.gender || 'coed'} onChange={e => setCoachEdits(p => ({ ...p, gender: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }}>
+                                <option value="coed">Coed</option>
+                                <option value="boys">Boys</option>
+                                <option value="girls">Girls</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Age Groups</label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {['U6','U8','U10','U12','U14','U16','U18','U19+'].map(ag => {
+                                const selected = (coachEdits.age_groups || []).includes(ag)
+                                return (
+                                  <button key={ag} type="button" onClick={() => {
+                                    setCoachEdits(p => ({
+                                      ...p,
+                                      age_groups: selected
+                                        ? (p.age_groups || []).filter((x: string) => x !== ag)
+                                        : [...(p.age_groups || []), ag]
+                                    }))
+                                  }}
+                                    className="font-mono text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
+                                    style={selected
+                                      ? { background: 'var(--fg-green)', color: 'white', borderColor: 'var(--fg-green)' }
+                                      : { background: 'var(--fg-surface)', color: 'var(--fg-muted)', borderColor: 'var(--fg-border2)' }}>
+                                    {ag}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>License</label>
+                              <input value={coachEdits.license || ''} onChange={e => setCoachEdits(p => ({ ...p, license: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                            </div>
+                            <div>
+                              <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>Email</label>
+                              <input value={coachEdits.email || ''} onChange={e => setCoachEdits(p => ({ ...p, email: e.target.value }))}
+                                className="w-full border rounded-lg px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-text)' }} />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <ActionBtn label="Save" color="green" loading={actionLoading === c.id} onClick={() => handleCoachSave(c.id)} />
+                            <button onClick={() => { setEditingCoach(null); setCoachEdits({}) }}
+                              className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all"
+                              style={{ background: 'var(--fg-surface)', color: 'var(--fg-muted)', borderColor: 'var(--fg-border2)' }}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ── View mode ── */
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm" style={{ color: 'var(--fg-text)' }}>{c.first_name} {c.last_name}</span>
+                              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded capitalize" style={{ background: c.status === 'approved' ? 'var(--fg-green-pale)' : 'var(--fg-surface)', color: c.status === 'approved' ? 'var(--fg-green)' : 'var(--fg-muted)' }}>{c.status}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {c.club && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>{c.club.name}</span>}
+                              {c.city && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.city}, {c.state}</span>}
+                              {c.gender && c.gender !== 'coed' && <span className="font-mono text-[10px] px-2 py-0.5 rounded border capitalize" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.gender}</span>}
+                              {(c.age_groups || []).length > 0 && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{(c.age_groups || []).join(', ')}</span>}
+                              {c.license && <span className="font-mono text-[10px] px-2 py-0.5 rounded border" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)' }}>{c.license}</span>}
+                            </div>
+                          </div>
+                          <button onClick={() => { fetchClubs(); startCoachEdit(c) }}
+                            className="font-mono text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all flex-shrink-0"
+                            style={{ background: 'var(--fg-surface)', color: 'var(--fg-green)', borderColor: 'var(--fg-green)' }}
+                            data-testid={`edit-coach-${c.id}`}>Edit</button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </>
         )}
       </div>
