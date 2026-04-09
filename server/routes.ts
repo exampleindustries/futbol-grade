@@ -1087,23 +1087,79 @@ export async function registerRoutes(
 
   // ── Shared crawl logic ───────────────────────────────────
 
-  async function scanClubWebsitesForEvents(submittedBy?: string): Promise<{ found: number; scanned: number }> {
+  async function scanClubWebsitesForEvents(submittedBy?: string): Promise<{ found: number; scanned: number; logos: number }> {
     const supabase = getSupabaseClient();
     const { data: clubs } = await supabase
       .from("clubs")
-      .select("id, name, website")
+      .select("id, name, website, logo_url")
       .not("website", "is", null)
       .eq("status", "approved");
 
-    if (!clubs || clubs.length === 0) return { found: 0, scanned: 0 };
+    if (!clubs || clubs.length === 0) return { found: 0, scanned: 0, logos: 0 };
 
     const eventKeywords = /camp|clinic|tournament|tryout|training|showcase|league|cup|classic|festival|jamboree|combine|registration|sign[- ]?up|open\s+house/i;
     const pathSuffixes = ["", "/events", "/camps", "/tournaments", "/programs", "/news", "/tryouts", "/schedule", "/calendar", "/clinics", "/registration"];
     let found = 0;
+    let logos = 0;
 
     for (const club of clubs) {
       if (!club.website) continue;
       const base = club.website.replace(/\/$/, "");
+
+      // Auto-discover logo from homepage if club has no logo
+      if (!club.logo_url) {
+        try {
+          const homeResp = await fetch(base, {
+            signal: AbortSignal.timeout(8000),
+            headers: { "User-Agent": "FutbolGrade-EventScanner/1.0" },
+            redirect: "follow",
+          });
+          if (homeResp.ok) {
+            const homeHtml = await homeResp.text();
+            let logoUrl: string | null = null;
+
+            // Priority 1: og:image
+            const ogMatch = homeHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+              || homeHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+            if (ogMatch) logoUrl = ogMatch[1];
+
+            // Priority 2: <link rel="icon"> or apple-touch-icon (higher res)
+            if (!logoUrl) {
+              const iconMatch = homeHtml.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i)
+                || homeHtml.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']apple-touch-icon["']/i);
+              if (iconMatch) logoUrl = iconMatch[1];
+            }
+
+            // Priority 3: img with "logo" in src or class or alt
+            if (!logoUrl) {
+              const logoImgMatch = homeHtml.match(/<img[^>]+src=["']([^"']+)["'][^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["']/i)
+                || homeHtml.match(/<img[^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i);
+              if (logoImgMatch) logoUrl = logoImgMatch[1] || logoImgMatch[2];
+            }
+
+            if (logoUrl) {
+              // Make absolute URL
+              if (!logoUrl.startsWith("http")) logoUrl = new URL(logoUrl, base).href;
+              // Upload to Supabase storage
+              try {
+                const imgResp = await fetch(logoUrl, { signal: AbortSignal.timeout(8000) });
+                if (imgResp.ok) {
+                  const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+                  const ext = logoUrl.match(/\.(png|jpg|jpeg|webp|svg)/i)?.[1] || "png";
+                  const storagePath = `${club.id}.${ext}`;
+                  await supabase.storage.from("club-logos").upload(storagePath, imgBuffer, { upsert: true, contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}` });
+                  const { data: urlData } = supabase.storage.from("club-logos").getPublicUrl(storagePath);
+                  const finalUrl = urlData.publicUrl + "?v=" + Date.now();
+                  await supabase.from("clubs").update({ logo_url: finalUrl }).eq("id", club.id);
+                  logos++;
+                  console.log(`[CRAWL] Logo found for ${club.name}: ${logoUrl}`);
+                }
+              } catch { /* skip logo download errors */ }
+            }
+          }
+        } catch { /* skip homepage errors */ }
+      }
+
       try {
         for (const suffix of pathSuffixes) {
           const url = base + suffix;
@@ -1193,7 +1249,7 @@ export async function registerRoutes(
       .eq("status", "approved")
       .lt("event_date", new Date().toISOString().split("T")[0]);
 
-    return { found, scanned: clubs.length };
+    return { found, scanned: clubs.length, logos };
   }
 
   // ── Admin: Manual crawl trigger ───────────────────────
@@ -1204,7 +1260,7 @@ export async function registerRoutes(
       if (!supabase) return;
       const { data: { user } } = await supabase.auth.getUser();
       const result = await scanClubWebsitesForEvents(user?.id);
-      return res.json({ ...result, message: `Scanned ${result.scanned} club websites, found ${result.found} potential events` });
+      return res.json({ ...result, message: `Scanned ${result.scanned} clubs: ${result.found} events found, ${result.logos} logos discovered` });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 

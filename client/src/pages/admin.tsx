@@ -950,22 +950,36 @@ export default function Admin() {
                     {editingClub === c.id ? (
                       /* ── Edit mode ── */
                       <div className="p-4 space-y-3">
-                        <div className="flex items-center gap-3 mb-1">
+                        {/* Drag-and-drop logo upload */}
+                        <div
+                          className="relative rounded-xl border-2 border-dashed p-4 text-center transition-all cursor-pointer"
+                          style={{ borderColor: uploadingLogo === c.id ? 'var(--fg-green)' : 'var(--fg-border2)', background: 'var(--fg-surface)' }}
+                          onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--fg-green)'; e.currentTarget.style.background = 'var(--fg-green-pale)' }}
+                          onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--fg-border2)'; e.currentTarget.style.background = 'var(--fg-surface)' }}
+                          onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--fg-border2)'; e.currentTarget.style.background = 'var(--fg-surface)'; const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('image/')) handleLogoUpload(c.id, c.name, f) }}
+                          onClick={() => document.getElementById(`logo-input-${c.id}`)?.click()}
+                        >
+                          <input id={`logo-input-${c.id}`} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                            onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(c.id, c.name, f); e.target.value = '' }} />
                           {c.logo_url ? (
-                            <img src={c.logo_url} alt={c.name} className="w-12 h-12 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
+                            <div className="flex items-center justify-center gap-4">
+                              <img src={c.logo_url} alt={c.name} className="w-16 h-16 rounded-xl object-contain border" style={{ borderColor: 'var(--fg-border)' }} />
+                              <div>
+                                <span className="font-mono text-[10px] font-bold block" style={{ color: uploadingLogo === c.id ? 'var(--fg-muted)' : 'var(--fg-green)' }}>
+                                  {uploadingLogo === c.id ? 'Uploading...' : 'Drop new logo here or click to replace'}
+                                </span>
+                                <span className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>PNG, JPG, or WebP</span>
+                              </div>
+                            </div>
                           ) : (
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center border-2 border-dashed" style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-muted)' }}>
-                              <span className="text-[9px] font-mono">Logo</span>
+                            <div className="py-3">
+                              <div className="text-2xl mb-1">🖼️</div>
+                              <span className="font-mono text-[10px] font-bold block" style={{ color: uploadingLogo === c.id ? 'var(--fg-muted)' : 'var(--fg-green)' }}>
+                                {uploadingLogo === c.id ? 'Uploading...' : 'Drag & drop logo here'}
+                              </span>
+                              <span className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>or click to browse · PNG, JPG, WebP</span>
                             </div>
                           )}
-                          <label className="cursor-pointer">
-                            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
-                              onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(c.id, c.name, f); e.target.value = '' }} />
-                            <span className="font-mono text-[10px] font-bold px-3 py-1.5 rounded-lg border inline-block"
-                              style={{ borderColor: 'var(--fg-border2)', color: uploadingLogo === c.id ? 'var(--fg-muted)' : 'var(--fg-green)' }}>
-                              {uploadingLogo === c.id ? 'Uploading...' : c.logo_url ? 'Replace Logo' : 'Upload Logo'}
-                            </span>
-                          </label>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
