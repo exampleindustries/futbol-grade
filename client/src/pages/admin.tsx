@@ -1012,19 +1012,40 @@ export default function Admin() {
               <div className="space-y-8">
                 {/* Pending section */}
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
                       <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>PENDING APPROVAL</span>
                       <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#f59e0b', color: 'white' }}>{pending.length}</span>
                     </div>
-                    {pending.length > 0 && (
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" className="w-4 h-4 rounded"
-                          checked={pending.length > 0 && pending.every(c => selectedClubs.has(c.id))}
-                          onChange={() => toggleAllSelection(selectedClubs, setSelectedClubs, pending.map(c => c.id))} />
-                        <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all ({pending.length})</span>
-                      </label>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          setActionLoading('crawl-logos')
+                          try {
+                            const auth = await getAuthHeader()
+                            const r = await fetch(`${getApiBase()}/api/admin/clubs/crawl-logos`, {
+                              method: 'POST', headers: { Authorization: auth },
+                            })
+                            const d = await r.json()
+                            alert(d.message || 'Done')
+                            await fetchClubs()
+                          } catch { alert('Crawl failed') }
+                          setActionLoading(null)
+                        }}
+                        disabled={actionLoading === 'crawl-logos'}
+                        className="font-mono text-[10px] font-semibold px-3 py-1.5 rounded-lg border transition-all whitespace-nowrap"
+                        style={{ background: 'var(--fg-surface)', color: 'var(--fg-green)', borderColor: 'var(--fg-green)' }}>
+                        {actionLoading === 'crawl-logos' ? 'Crawling...' : '🔍 Crawl Top 10 Logos'}
+                      </button>
+                      {pending.length > 0 && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" className="w-4 h-4 rounded"
+                            checked={pending.length > 0 && pending.every(c => selectedClubs.has(c.id))}
+                            onChange={() => toggleAllSelection(selectedClubs, setSelectedClubs, pending.map(c => c.id))} />
+                          <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all ({pending.length})</span>
+                        </label>
+                      )}
+                    </div>
                   </div>
                   {pending.length === 0 ? (
                     <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
