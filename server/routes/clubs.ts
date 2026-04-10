@@ -4,6 +4,22 @@ import { getSupabaseClient, requireAdmin, logAudit } from "../lib/supabase";
 import { bulkActionLimiter } from "../lib/rate-limiters";
 
 export function registerClubRoutes(app: Express) {
+  // Public: all approved clubs (for map)
+  app.get("/api/clubs", async (req, res) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from("clubs")
+        .select("id, name, city, state, logo_url, lat, lng, avg_overall, website")
+        .eq("status", "approved")
+        .not("lat", "is", null);
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data || []);
+    } catch {
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Public: nearby clubs (geo-search)
   app.get("/api/clubs/nearby", async (req, res) => {
     try {

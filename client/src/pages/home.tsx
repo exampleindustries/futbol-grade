@@ -338,6 +338,88 @@ function ClubMarquee({ clubs }: { clubs: Club[] }) {
   )
 }
 
+// ── Club Map ────────────────────────────────────────────────
+function ClubMap() {
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+
+  useEffect(() => {
+    // Load Leaflet CSS
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id = 'leaflet-css'
+      link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      document.head.appendChild(link)
+    }
+
+    // Load Leaflet JS then init map
+    function initMap(clubs: any[]) {
+      if (!mapRef.current || mapInstanceRef.current) return
+      const L = (window as any).L
+      const map = L.map(mapRef.current, { scrollWheelZoom: false }).setView([34.0, -118.2], 8)
+      mapInstanceRef.current = map
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18,
+      }).addTo(map)
+
+      clubs.forEach((club: any) => {
+        if (!club.lat || !club.lng) return
+        const icon = L.divIcon({
+          className: '',
+          html: club.logo_url
+            ? `<div style="width:36px;height:36px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);overflow:hidden;background:#fff"><img src="${club.logo_url}" style="width:100%;height:100%;object-fit:contain" /></div>`
+            : `<div style="width:36px;height:36px;border-radius:50%;background:#22c55e;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">${club.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}</div>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18],
+        })
+        const marker = L.marker([club.lat, club.lng], { icon }).addTo(map)
+        marker.bindPopup(`
+          <div style="font-family:sans-serif;min-width:140px">
+            ${club.logo_url ? `<img src="${club.logo_url}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;margin-bottom:6px" />` : ''}
+            <div style="font-weight:700;font-size:13px">${club.name}</div>
+            <div style="color:#666;font-size:11px">${club.city || ''}${club.state ? ', ' + club.state : ''}</div>
+            ${club.avg_overall > 0 ? `<div style="color:#22c55e;font-size:11px;margin-top:4px">★ ${club.avg_overall.toFixed(1)}</div>` : ''}
+            <a href="/clubs/${club.id}" style="display:inline-block;margin-top:6px;font-size:11px;color:#22c55e">View Club →</a>
+          </div>
+        `)
+      })
+    }
+
+    fetch(`${API}/api/clubs`)
+      .then(r => r.json())
+      .then((clubs: any[]) => {
+        if ((window as any).L) { initMap(clubs); return }
+        const script = document.createElement('script')
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+        script.onload = () => initMap(clubs)
+        document.head.appendChild(script)
+      })
+      .catch(() => {})
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove()
+        mapInstanceRef.current = null
+      }
+    }
+  }, [])
+
+  return (
+    <section className="border-t" style={{ borderColor: 'var(--fg-border)' }}>
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="text-center mb-8">
+          <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Explore</span>
+          <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: 'var(--fg-text)' }}>MEMBER CLUBS MAP</h2>
+          <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>Find rated clubs near you</p>
+        </div>
+        <div ref={mapRef} style={{ height: 500, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--fg-border)' }} />
+      </div>
+    </section>
+  )
+}
+
 export default function Home() {
   const [coaches, setCoaches] = useState<Coach[]>([])
   const [clubs, setClubs] = useState<Club[]>([])
@@ -683,6 +765,9 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* Club Map */}
+      <ClubMap />
 
       {/* Footer */}
       <footer className="border-t py-8" style={{ borderColor: 'var(--fg-border)' }}>
