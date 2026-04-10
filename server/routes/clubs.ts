@@ -122,6 +122,121 @@ export function registerClubRoutes(app: Express) {
     }
   });
 
+  // Admin: crawl logos for top 10 pending clubs and set as coach photo default
+  app.post("/api/admin/clubs/crawl-logos", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+
+      const { data: clubs } = await supabase
+        .from("clubs")
+        .select("id, name, website, logo_url")
+        .eq("status", "pending")
+        .not("website", "is", null)
+        .order("name")
+        .limit(10);
+
+      if (!clubs || clubs.length === 0) return res.json({ ok: true, crawled: 0, logos: 0, coaches: 0 });
+
+      let logos = 0;
+      let coachesUpdated = 0;
+
+      for (const club of clubs) {
+        if (!club.website) continue;
+        const base = club.website.replace(/\/$/, "");
+        let logoUrl: string | null = club.logo_url || null;
+
+        if (!logoUrl) {
+          try {
+            const resp = await fetch(base, {
+              signal: AbortSignal.timeout(8000),
+              headers: { "User-Agent": "FutbolGrade-LogoCrawler/1.0" },
+              redirect: "follow",
+            });
+            if (resp.ok) {
+              const html = await resp.text();
+
+              const ogMatch =
+                html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+                html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+              if (ogMatch) logoUrl = ogMatch[1];
+
+              if (!logoUrl) {
+                const iconMatch =
+                  html.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i) ||
+                  html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']apple-touch-icon["']/i);
+                if (iconMatch) logoUrl = iconMatch[1];
+              }
+
+              if (!logoUrl) {
+                const logoImgMatch =
+                  html.match(/<img[^>]+src=["']([^"']+)["'][^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["']/i) ||
+                  html.match(/<img[^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i);
+                if (logoImgMatch) logoUrl = logoImgMatch[1];
+              }
+
+              if (logoUrl && !logoUrl.startsWith("http")) {
+                logoUrl = new URL(logoUrl, base).href;
+              }
+
+              if (logoUrl) {
+                try {
+                  const imgResp = await fetch(logoUrl, { signal: AbortSignal.timeout(8000) });
+                  if (imgResp.ok) {
+                    const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+                    const ext = logoUrl.match(/\.(png|jpg|jpeg|webp|svg)/i)?.[1] || "png";
+                    const storagePath = `${club.id}.${ext}`;
+                    await supabase.storage.from("club-logos").upload(storagePath, imgBuffer, {
+                      upsert: true,
+                      contentType: `image/${ext === "jpg" ? "jpeg" : ext}`,
+                    });
+                    const { data: urlData } = supabase.storage.from("club-logos").getPublicUrl(storagePath);
+                    logoUrl = urlData.publicUrl + "?v=" + Date.now();
+                    await supabase.from("clubs").update({ logo_url: logoUrl }).eq("id", club.id);
+                    logos++;
+                    console.log(`[LOGO-CRAWL] Found logo for ${club.name}: ${logoUrl}`);
+                  } else {
+                    logoUrl = null;
+                  }
+                } catch {
+                  logoUrl = null;
+                }
+              }
+            }
+          } catch {
+            /* skip */
+          }
+        }
+
+        // Set coaches without a photo to use the club logo
+        if (logoUrl) {
+          const { data: coaches } = await supabase
+            .from("coaches")
+            .select("id, photo_url")
+            .eq("club_id", club.id)
+            .is("photo_url", null);
+          if (coaches && coaches.length > 0) {
+            await supabase
+              .from("coaches")
+              .update({ photo_url: logoUrl })
+              .in("id", coaches.map((c: any) => c.id));
+            coachesUpdated += coaches.length;
+          }
+        }
+      }
+
+      return res.json({
+        ok: true,
+        crawled: clubs.length,
+        logos,
+        coaches: coachesUpdated,
+        message: `Crawled ${clubs.length} clubs: ${logos} logos found, ${coachesUpdated} coaches updated`,
+      });
+    } catch {
+      return res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Admin: bulk action on clubs
   app.post("/api/admin/clubs/bulk", bulkActionLimiter, async (req, res) => {
     try {
