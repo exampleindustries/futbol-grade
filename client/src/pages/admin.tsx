@@ -1001,6 +1001,33 @@ export default function Admin() {
         {/* Clubs tab */}
         {tab === 'clubs' && (
           <>
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>
+                {adminClubs.length} total clubs
+              </span>
+              <button
+                onClick={async () => {
+                  setActionLoading('import-gotsport')
+                  try {
+                    const auth = await getAuthHeader()
+                    const r = await fetch(`${getApiBase()}/api/admin/clubs/import-gotsport`, {
+                      method: 'POST',
+                      headers: { Authorization: auth, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ batch: 5 }),
+                    })
+                    const d = await r.json()
+                    if (d.log?.length) console.log('[GotSport Import]', d.log)
+                    alert(d.message || d.error || 'Done')
+                    await fetchClubs()
+                  } catch { alert('Import failed') }
+                  setActionLoading(null)
+                }}
+                disabled={actionLoading === 'import-gotsport'}
+                className="font-mono text-[10px] font-semibold px-3 py-1.5 rounded-lg border transition-all whitespace-nowrap"
+                style={{ background: 'var(--fg-surface)', color: 'var(--fg-green)', borderColor: 'var(--fg-green)' }}>
+                {actionLoading === 'import-gotsport' ? 'Importing...' : '⚽ Import from GotSport (5)'}
+              </button>
+            </div>
             <BulkToolbar count={selectedClubs.size} loading={actionLoading === 'bulk-clubs'} actions={[
               { label: 'Approve', color: 'green', onClick: () => handleBulkClubs('approved') },
               { label: 'Reject', color: 'amber', onClick: () => handleBulkClubs('rejected') },
@@ -1574,21 +1601,15 @@ export default function Admin() {
                 const q = coachSearch.toLowerCase()
                 return c.first_name.toLowerCase().includes(q) || c.last_name.toLowerCase().includes(q) || (c.club?.name || '').toLowerCase().includes(q)
               })
-              return filtered.length === 0 ? (
-                <EmptyState text="No coaches found" />
-              ) : (
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="w-4 h-4 rounded"
-                      checked={filtered.length > 0 && filtered.every(c => selectedCoaches.has(c.id))}
-                      onChange={() => toggleAllSelection(selectedCoaches, setSelectedCoaches, filtered.map(c => c.id))} />
-                    <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all ({filtered.length})</span>
-                  </label>
-                  {filtered.map(c => (
+              const pendingCoaches = filtered.filter(c => c.status === 'pending')
+              const approvedCoaches = filtered.filter(c => c.status === 'approved')
+
+              const renderCoachCard = (c: any) => (
                     <div key={c.id} className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: selectedCoaches.has(c.id) ? 'var(--fg-green)' : 'var(--fg-border)' }} data-testid={`admin-coach-${c.id}`}>
                       {editingCoach === c.id ? (
                         /* ── Edit mode ── */
                         <div className="p-4 space-y-3">
+
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="block font-mono text-[9px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--fg-muted)' }}>First Name</label>
@@ -1716,7 +1737,51 @@ export default function Admin() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  )
+
+              if (filtered.length === 0) return <EmptyState text="No coaches found" />
+
+              return (
+                <div className="space-y-8">
+                  {/* Pending section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>PENDING APPROVAL</span>
+                        <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#f59e0b', color: 'white' }}>{pendingCoaches.length}</span>
+                      </div>
+                      {pendingCoaches.length > 0 && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" className="w-4 h-4 rounded"
+                            checked={pendingCoaches.every(c => selectedCoaches.has(c.id))}
+                            onChange={() => toggleAllSelection(selectedCoaches, setSelectedCoaches, pendingCoaches.map(c => c.id))} />
+                          <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>Select all ({pendingCoaches.length})</span>
+                        </label>
+                      )}
+                    </div>
+                    {pendingCoaches.length === 0 ? (
+                      <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                        <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>No pending coaches</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">{pendingCoaches.map(c => renderCoachCard(c))}</div>
+                    )}
+                  </div>
+
+                  {/* Approved section */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="font-bebas text-xl tracking-[2px]" style={{ color: 'var(--fg-text)' }}>APPROVED</span>
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--fg-green)', color: 'white' }}>{approvedCoaches.length}</span>
+                    </div>
+                    {approvedCoaches.length === 0 ? (
+                      <div className="bg-white border rounded-xl p-6 text-center" style={{ borderColor: 'var(--fg-border)' }}>
+                        <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>No approved coaches</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">{approvedCoaches.map(c => renderCoachCard(c))}</div>
+                    )}
+                  </div>
                 </div>
               )
             })()}

@@ -138,6 +138,199 @@ export function registerClubRoutes(app: Express) {
     }
   });
 
+  // Admin: import clubs + coaches from GotSport SOCAL event
+  app.post("/api/admin/clubs/import-gotsport", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+
+      const BASE = "https://system.gotsport.com";
+      const EVENT_URL = `${BASE}/org_event/events/43086/clubs`;
+      const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+      const HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml" };
+      const { batch = 5 } = req.body; // how many clubs to process per run
+
+      async function fetchHtml(url: string): Promise<string | null> {
+        try {
+          const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(15000), redirect: "follow" });
+          if (!r.ok) return null;
+          return await r.text();
+        } catch { return null; }
+      }
+
+      // ── Step 1: get club list ────────────────────────────────
+      const clubsHtml = await fetchHtml(EVENT_URL);
+      if (!clubsHtml) return res.status(502).json({ error: "Could not reach GotSport" });
+
+      // Parse club rows: <a href="/org_event/events/43086/clubs/XXXX">Club Name</a>
+      const clubLinkRe = /href="(\/org_event\/events\/43086\/clubs\/(\d+)[^"]*)"[^>]*>\s*([^<]+?)\s*</gi;
+      const clubLinks: { url: string; gsId: string; name: string }[] = [];
+      let cm;
+      while ((cm = clubLinkRe.exec(clubsHtml)) !== null) {
+        const name = cm[3].trim();
+        if (name && !clubLinks.find(c => c.gsId === cm![2])) {
+          clubLinks.push({ url: `${BASE}${cm[1]}`, gsId: cm[2], name });
+        }
+      }
+
+      if (!clubLinks.length) return res.status(502).json({ error: "Could not parse club list from GotSport", preview: clubsHtml.substring(0, 500) });
+
+      // Get existing club names to skip already-imported ones
+      const { data: existingClubs } = await supabase.from("clubs").select("id, name").limit(1000);
+      const existingNames = new Set((existingClubs || []).map((c: any) => c.name.toLowerCase().trim()));
+
+      // Take next batch of clubs not yet in DB by name
+      const toProcess = clubLinks.filter(c => !existingNames.has(c.name.toLowerCase().trim())).slice(0, batch);
+      if (!toProcess.length) return res.json({ ok: true, message: `All ${clubLinks.length} GotSport clubs already exist in DB`, total: clubLinks.length });
+
+      let clubsCreated = 0, clubsUpdated = 0, coachesCreated = 0;
+      const log: string[] = [];
+
+      for (const clubEntry of toProcess) {
+        // ── Step 2: get team list for this club ────────────────
+        const clubHtml = await fetchHtml(clubEntry.url);
+        if (!clubHtml) { log.push(`SKIP ${clubEntry.name}: could not fetch`); continue; }
+
+        // Parse team links: look for links to team/schedule pages
+        const teamLinkRe = /href="(\/org_event\/events\/43086\/schedule[^"]*team_id=(\d+)[^"]*)"[^>]*>/gi;
+        const altTeamRe = /href="([^"]*\/teams?\/(\d+)[^"]*)"[^>]*>/gi;
+        const teamLinks: { url: string; id: string }[] = [];
+        let tm;
+        while ((tm = teamLinkRe.exec(clubHtml)) !== null) {
+          if (!teamLinks.find(t => t.id === tm![2])) teamLinks.push({ url: `${BASE}${tm[1]}`, id: tm[2] });
+        }
+        if (!teamLinks.length) {
+          while ((tm = altTeamRe.exec(clubHtml)) !== null) {
+            if (!teamLinks.find(t => t.id === tm![2])) teamLinks.push({ url: `${BASE}${tm[1]}`, id: tm[2] });
+          }
+        }
+
+        // ── Step 3: find club logo + coaches from team pages ───
+        let logoImgUrl: string | null = null;
+        const coaches: { firstName: string; lastName: string; gender: string; ageGroup: string }[] = [];
+
+        for (const team of teamLinks.slice(0, 20)) { // max 20 teams per club
+          const teamHtml = await fetchHtml(team.url);
+          if (!teamHtml) continue;
+
+          // Grab logo from first team that has one
+          if (!logoImgUrl) {
+            const imgRe = /<img[^>]+src="([^"]+)"[^>]*(?:class|alt)="[^"]*(?:logo|crest|badge|club)[^"]*"/i;
+            const imgRe2 = /class="[^"]*(?:logo|crest|badge|team-img)[^"]*"[^>]*src="([^"]+)"/i;
+            const logoMatch = imgRe.exec(teamHtml) || imgRe2.exec(teamHtml);
+            // Also try: first <img> near the coach name block
+            const nearCoachImg = /<img[^>]+src="(https?:\/\/[^"]+(?:png|jpg|jpeg|webp|svg)[^"]*)"[^>]*>/i;
+            if (logoMatch) {
+              logoImgUrl = logoMatch[1].startsWith("http") ? logoMatch[1] : `${BASE}${logoMatch[1]}`;
+            } else {
+              const ncm = nearCoachImg.exec(teamHtml);
+              if (ncm) logoImgUrl = ncm[1];
+            }
+          }
+
+          // Parse gender + age from team name or table cell
+          // Team name format: "Club Name ABBR GXX Gender" e.g. "City SC Southwest CITY SC SW G18 Premier LE"
+          // Age column has "U8", "U9" etc; Gender column has "Female"/"Male"
+          const ageMatch = teamHtml.match(/\b(U\d+)\b/i);
+          const genderMatch = teamHtml.match(/\b(Female|Male)\b/i);
+          const ageGroup = ageMatch ? ageMatch[1].toUpperCase() : "";
+          const gender = genderMatch ? (genderMatch[1] === "Female" ? "girls" : "boys") : "coed";
+
+          // Parse coaches: "Coach: First Last" pattern
+          const coachRe = /Coach:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g;
+          let coachMatch;
+          while ((coachMatch = coachRe.exec(teamHtml)) !== null) {
+            const parts = coachMatch[1].trim().split(/\s+/);
+            if (parts.length >= 2) {
+              const firstName = parts[0];
+              const lastName = parts.slice(1).join(" ");
+              if (!coaches.find(c => c.firstName === firstName && c.lastName === lastName)) {
+                coaches.push({ firstName, lastName, gender, ageGroup });
+              }
+            }
+          }
+        }
+
+        // ── Step 4: upsert club ────────────────────────────────
+        async function storeLogoForClub(id: string): Promise<string | null> {
+          if (!logoImgUrl) return null;
+          try {
+            const imgR = await fetch(logoImgUrl!, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
+            if (!imgR.ok) return null;
+            const buf = Buffer.from(await imgR.arrayBuffer());
+            const ext = logoImgUrl!.match(/\.(png|jpg|jpeg|webp|svg)/i)?.[1] || "png";
+            await supabase.storage.from("club-logos").upload(`${id}.${ext}`, buf, { upsert: true, contentType: `image/${ext === "jpg" ? "jpeg" : ext}` });
+            const { data: pu } = supabase.storage.from("club-logos").getPublicUrl(`${id}.${ext}`);
+            return pu.publicUrl;
+          } catch { return null; }
+        }
+
+        let clubId: string = "";
+        // Club already exists in DB (matched by name earlier, but now we look up by name for id)
+        const { data: matchedClub } = await supabase
+          .from("clubs").select("id, logo_url").eq("name", clubEntry.name).maybeSingle();
+
+        if (matchedClub) {
+          const updates: any = {};
+          if (logoImgUrl && !matchedClub.logo_url) {
+            const stored = await storeLogoForClub(matchedClub.id);
+            if (stored) updates.logo_url = stored;
+          }
+          if (Object.keys(updates).length) await supabase.from("clubs").update(updates).eq("id", matchedClub.id);
+          clubId = matchedClub.id;
+          clubsUpdated++;
+          log.push(`UPDATED ${clubEntry.name} (${coaches.length} coaches)`);
+        } else {
+          // Create new club as pending
+          const { data: ins } = await supabase.from("clubs")
+            .insert({ name: clubEntry.name, status: "pending" }).select("id").single();
+          if (ins) {
+            clubId = ins.id;
+            const stored = await storeLogoForClub(clubId);
+            if (stored) await supabase.from("clubs").update({ logo_url: stored }).eq("id", clubId);
+          }
+          clubsCreated++;
+          log.push(`CREATED ${clubEntry.name} (${coaches.length} coaches)`);
+        }
+
+        // ── Step 5: upsert coaches ─────────────────────────────
+        for (const coach of coaches) {
+          const { data: existing } = await supabase
+            .from("coaches")
+            .select("id")
+            .eq("first_name", coach.firstName)
+            .eq("last_name", coach.lastName)
+            .eq("club_id", clubId)
+            .maybeSingle();
+          if (!existing) {
+            await supabase.from("coaches").insert({
+              first_name: coach.firstName,
+              last_name: coach.lastName,
+              club_id: clubId,
+              gender: coach.gender,
+              age_groups: coach.ageGroup ? [coach.ageGroup] : [],
+              status: "pending",
+            });
+            coachesCreated++;
+          }
+        }
+      }
+
+      return res.json({
+        ok: true,
+        clubsTotal: clubLinks.length,
+        remaining: clubLinks.filter(c => !importedIds.has(c.gsId)).length - toProcess.length,
+        clubsCreated,
+        clubsUpdated,
+        coachesCreated,
+        message: `Processed ${toProcess.length} clubs: ${clubsCreated} created, ${clubsUpdated} updated, ${coachesCreated} coaches added`,
+        log,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || "Server error" });
+    }
+  });
+
   // Admin: bulk action on clubs
   app.post("/api/admin/clubs/bulk", bulkActionLimiter, async (req, res) => {
     try {
