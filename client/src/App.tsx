@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Switch, Route, Router } from "wouter";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -74,7 +75,9 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router>
-          <AppRouter />
+          <ErrorBoundary>
+            <AppRouter />
+          </ErrorBoundary>
         </Router>
       </TooltipProvider>
     </QueryClientProvider>

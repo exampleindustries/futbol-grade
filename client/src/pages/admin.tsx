@@ -655,13 +655,13 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="flex gap-2 mb-6">
+        {/* Tab bar — horizontally scrollable on mobile */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
           {(['reviews', 'listings', 'claims', 'imports', 'events', 'coaches', 'users', 'clubs', 'sponsors', 'audit'] as Tab[]).map(t => {
             const count = stats ? (t === 'reviews' ? stats.reviews.pending : t === 'listings' ? stats.listings.pending : t === 'claims' ? stats.claims.pending : t === 'imports' ? stats.imports.pending : t === 'events' ? stats.events.pending : t === 'coaches' ? allCoaches.length : t === 'users' ? users.length : t === 'clubs' ? adminClubs.length : t === 'sponsors' ? adminSponsors.length : t === 'audit' ? auditLog.length : 0) : 0
             return (
               <button key={t} onClick={() => setTab(t)}
-                className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize"
+                className="font-mono text-xs font-semibold px-4 py-2 rounded-lg border transition-all capitalize whitespace-nowrap flex-shrink-0"
                 style={tab === t
                   ? { background: 'var(--fg-green)', color: 'white', borderColor: 'var(--fg-green)' }
                   : { background: 'var(--fg-surface)', color: 'var(--fg-text2)', borderColor: 'var(--fg-border2)' }}
@@ -1269,7 +1269,8 @@ export default function Admin() {
             {loading ? <Skeleton /> : users.length === 0 ? (
               <EmptyState text="No users found" />
             ) : (
-              <div className="bg-white border rounded-xl overflow-hidden" style={{ borderColor: 'var(--fg-border)' }}>
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="bg-white border rounded-xl overflow-hidden min-w-[600px] sm:min-w-0 mx-4 sm:mx-0" style={{ borderColor: 'var(--fg-border)' }}>
                 {/* Table header */}
                 <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-5 py-3 border-b font-mono text-[10px] font-bold tracking-widest uppercase"
                   style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-muted)', background: 'var(--fg-surface)' }}>
@@ -1340,6 +1341,7 @@ export default function Admin() {
                     </div>
                   ))}
                 </div>
+              </div>
               </div>
             )}
           </>
@@ -1468,7 +1470,7 @@ export default function Admin() {
         {/* Events tab */}
         {tab === 'events' && (
           <>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <FilterBar<'pending' | 'approved' | 'rejected'>
                 options={[
                   { value: 'pending', label: 'Pending' },
@@ -1837,7 +1839,7 @@ export default function Admin() {
                   return (
                     <div key={s.id} className="bg-white border rounded-xl px-5 py-4" style={{ borderColor: !s.is_active || expired ? 'var(--fg-border)' : s.is_main_sponsor ? 'var(--fg-green)' : 'var(--fg-border)' }}
                       data-testid={`sponsor-row-${s.id}`}>
-                      <div className="flex items-start gap-4">
+                      <div className="flex flex-wrap items-start gap-3 gap-y-3">
                         {/* Logo */}
                         <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 border overflow-hidden"
                           style={{ background: 'var(--fg-surface)', borderColor: 'var(--fg-border)' }}>
@@ -1862,8 +1864,8 @@ export default function Admin() {
                             {s.contact_email && <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{s.contact_email}</span>}
                           </div>
                         </div>
-                        {/* Analytics inline */}
-                        <div className="flex items-center gap-4 flex-shrink-0 mr-4">
+                        {/* Analytics inline — hidden on mobile, visible on desktop */}
+                        <div className="hidden sm:flex items-center gap-4 flex-shrink-0 mr-2">
                           <div className="text-center">
                             <div className="font-bebas text-lg" style={{ color: 'var(--fg-text)' }}>{(s.impressions || 0).toLocaleString()}</div>
                             <div className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>views</div>
@@ -1886,7 +1888,7 @@ export default function Admin() {
                           )}
                         </div>
                         {/* Actions */}
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <button onClick={async () => {
                             if (expandedSponsorAnalytics === s.id) { setExpandedSponsorAnalytics(null); return }
                             setExpandedSponsorAnalytics(s.id)
