@@ -1,18 +1,24 @@
 // server/lib/rate-limiters.ts
 import rateLimit from "express-rate-limit";
-import { RedisStore } from "rate-limit-redis";
 import { redisClient } from "./redis";
 
 export const BULK_DELETE_CAP = 25;
 
 // When Redis is available, use it as the backing store so limits survive
-// server restarts. Falls back to in-memory when REDIS_URL is not set.
+// server restarts. Falls back to in-memory when REDIS_URL is not set or
+// rate-limit-redis is not installed.
 function makeStore(prefix: string) {
   if (!redisClient) return undefined;
-  return new RedisStore({
-    prefix: `rl:${prefix}:`,
-    sendCommand: (...args: string[]) => (redisClient as any).call(...args),
-  });
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { RedisStore } = require("rate-limit-redis");
+    return new RedisStore({
+      prefix: `rl:${prefix}:`,
+      sendCommand: (...args: string[]) => (redisClient as any).call(...args),
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 export const reviewLimiter = rateLimit({

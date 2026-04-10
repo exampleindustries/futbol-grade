@@ -1,24 +1,30 @@
 // server/lib/redis.ts
-// Redis client — only connects when REDIS_URL is set.
-// When absent (local dev), all callers fall back to in-memory behaviour.
-import Redis from "ioredis";
+// Redis client — only connects when REDIS_URL is set AND ioredis is installed.
+// When absent (local dev / no Redis), all callers fall back to in-memory behaviour.
 
-let redisClient: Redis | null = null;
+let redisClient: any = null;
 
 if (process.env.REDIS_URL) {
-  redisClient = new Redis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: false,
-    lazyConnect: true,
-  });
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Redis = require("ioredis");
+    const RedisClass = Redis.default || Redis;
+    redisClient = new RedisClass(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 3,
+      enableReadyCheck: false,
+      lazyConnect: true,
+    });
 
-  redisClient.on("error", (err) => {
-    console.error("[Redis] connection error:", err.message);
-  });
+    redisClient.on("error", (err: Error) => {
+      console.error("[Redis] connection error:", err.message);
+    });
 
-  redisClient.on("connect", () => {
-    console.log("[Redis] connected");
-  });
+    redisClient.on("connect", () => {
+      console.log("[Redis] connected");
+    });
+  } catch {
+    console.warn("[Redis] ioredis not installed, using in-memory rate limiting");
+  }
 }
 
 export { redisClient };
