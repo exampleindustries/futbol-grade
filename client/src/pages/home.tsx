@@ -338,13 +338,20 @@ function ClubMarquee({ clubs }: { clubs: Club[] }) {
   )
 }
 
+// Generate a consistent pastel color from a string
+function clubColor(id: string) {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash)
+  const h = Math.abs(hash) % 360
+  return { fill: `hsla(${h},70%,60%,0.18)`, stroke: `hsla(${h},70%,45%,0.7)`, solid: `hsl(${h},70%,45%)` }
+}
+
 // ── Club Map ────────────────────────────────────────────────
 function ClubMap() {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
 
   useEffect(() => {
-    // Load Leaflet CSS
     if (!document.getElementById('leaflet-css')) {
       const link = document.createElement('link')
       link.id = 'leaflet-css'
@@ -353,37 +360,65 @@ function ClubMap() {
       document.head.appendChild(link)
     }
 
-    // Load Leaflet JS then init map
     function initMap(clubs: any[]) {
       if (!mapRef.current || mapInstanceRef.current) return
       const L = (window as any).L
-      const map = L.map(mapRef.current, { scrollWheelZoom: false }).setView([34.0, -118.2], 8)
+
+      const map = L.map(mapRef.current, {
+        scrollWheelZoom: false,
+        zoomControl: true,
+      }).setView([34.0, -118.2], 8)
       mapInstanceRef.current = map
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 18,
+
+      // CartoDB Positron — minimal, no terrain clutter
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://carto.com">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19,
+      }).addTo(map)
+
+      // City label layer on top (roads/labels only, no terrain fill)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+        attribution: '',
+        subdomains: 'abcd',
+        maxZoom: 19,
+        pane: 'shadowPane',
       }).addTo(map)
 
       clubs.forEach((club: any) => {
         if (!club.lat || !club.lng) return
+        const { fill, stroke, solid } = clubColor(club.id)
+
+        // Soft colored glow circle for each club's area
+        L.circle([club.lat, club.lng], {
+          radius: 8000,
+          color: stroke,
+          fillColor: fill,
+          fillOpacity: 1,
+          weight: 1.5,
+          opacity: 0.6,
+        }).addTo(map)
+
+        // Logo / initial pin on top
         const icon = L.divIcon({
           className: '',
           html: club.logo_url
-            ? `<div style="width:36px;height:36px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);overflow:hidden;background:#fff"><img src="${club.logo_url}" style="width:100%;height:100%;object-fit:contain" /></div>`
-            : `<div style="width:36px;height:36px;border-radius:50%;background:#22c55e;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">${club.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}</div>`,
-          iconSize: [36, 36],
-          iconAnchor: [18, 18],
+            ? `<div style="width:38px;height:38px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);overflow:hidden;background:#fff"><img src="${club.logo_url}" style="width:100%;height:100%;object-fit:contain" /></div>`
+            : `<div style="width:38px;height:38px;border-radius:50%;background:${solid};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-family:sans-serif">${club.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}</div>`,
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
         })
+
         const marker = L.marker([club.lat, club.lng], { icon }).addTo(map)
         marker.bindPopup(`
-          <div style="font-family:sans-serif;min-width:140px">
-            ${club.logo_url ? `<img src="${club.logo_url}" style="width:48px;height:48px;object-fit:contain;border-radius:8px;margin-bottom:6px" />` : ''}
-            <div style="font-weight:700;font-size:13px">${club.name}</div>
-            <div style="color:#666;font-size:11px">${club.city || ''}${club.state ? ', ' + club.state : ''}</div>
-            ${club.avg_overall > 0 ? `<div style="color:#22c55e;font-size:11px;margin-top:4px">★ ${club.avg_overall.toFixed(1)}</div>` : ''}
-            <a href="/clubs/${club.id}" style="display:inline-block;margin-top:6px;font-size:11px;color:#22c55e">View Club →</a>
+          <div style="font-family:sans-serif;min-width:150px;padding:4px">
+            ${club.logo_url ? `<img src="${club.logo_url}" style="width:44px;height:44px;object-fit:contain;border-radius:8px;margin-bottom:6px;display:block" />` : ''}
+            <div style="font-weight:700;font-size:13px;color:#111">${club.name}</div>
+            <div style="color:#888;font-size:11px;margin-top:2px">${[club.city, club.state].filter(Boolean).join(', ')}</div>
+            ${club.avg_overall > 0 ? `<div style="color:#16a34a;font-size:11px;margin-top:4px;font-weight:600">★ ${Number(club.avg_overall).toFixed(1)}</div>` : ''}
+            <a href="/clubs/${club.id}" style="display:inline-block;margin-top:8px;font-size:11px;color:#16a34a;font-weight:600;text-decoration:none">View Club →</a>
           </div>
-        `)
+        `, { maxWidth: 200 })
       })
     }
 
@@ -412,9 +447,9 @@ function ClubMap() {
         <div className="text-center mb-8">
           <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Explore</span>
           <h2 className="font-bebas text-2xl tracking-[2px] mt-1" style={{ color: 'var(--fg-text)' }}>MEMBER CLUBS MAP</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>Find rated clubs near you</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>Click a pin to explore a club</p>
         </div>
-        <div ref={mapRef} style={{ height: 500, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--fg-border)' }} />
+        <div ref={mapRef} style={{ height: 520, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--fg-border)', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }} />
       </div>
     </section>
   )
