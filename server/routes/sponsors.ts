@@ -68,29 +68,18 @@ export function registerSponsorRoutes(app: Express) {
       const today = new Date().toISOString().slice(0, 10);
 
       for (const sid of sponsor_ids.slice(0, 50)) {
-        await supabase
-          .rpc("increment_sponsor_analytics", {
-            p_sponsor_id: sid,
-            p_date: today,
-            p_col: col,
-          })
-          .then(() => {})
-          .catch(() => {
-            supabase
-              .from("sponsor_analytics")
-              .upsert(
-                { sponsor_id: sid, date: today, [col]: 1 },
-                { onConflict: "sponsor_id,date" }
-              )
-              .then(() => {});
-          });
+        await Promise.resolve(
+          supabase.rpc("increment_sponsor_analytics", { p_sponsor_id: sid, p_date: today, p_col: col })
+        ).catch(() =>
+          supabase.from("sponsor_analytics").upsert(
+            { sponsor_id: sid, date: today, [col]: 1 },
+            { onConflict: "sponsor_id,date" }
+          )
+        );
 
-        await supabase
-          .rpc("increment_sponsor_counter", {
-            p_sponsor_id: sid,
-            p_col: col,
-          })
-          .catch(() => {});
+        await Promise.resolve(
+          supabase.rpc("increment_sponsor_counter", { p_sponsor_id: sid, p_col: col })
+        ).catch(() => {});
       }
 
       return res.json({ ok: true });
