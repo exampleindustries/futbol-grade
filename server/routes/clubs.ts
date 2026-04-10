@@ -40,12 +40,12 @@ export function registerClubRoutes(app: Express) {
         .not("lat", "is", null);
       if (error) return res.status(400).json({ error: error.message });
 
-      function haversine(
+      const haversine = (
         lat1: number,
         lon1: number,
         lat2: number,
         lon2: number
-      ) {
+      ) => {
         const R = 3959;
         const dLat = ((lat2 - lat1) * Math.PI) / 180;
         const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -150,7 +150,7 @@ export function registerClubRoutes(app: Express) {
       const HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml" };
       const { batch = 5 } = req.body; // how many clubs to process per run
 
-      async function fetchHtml(url: string): Promise<string | null> {
+      const fetchHtml = async (url: string): Promise<string | null> => {
         try {
           const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(15000), redirect: "follow" });
           if (!r.ok) return null;

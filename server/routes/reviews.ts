@@ -73,26 +73,16 @@ export function registerReviewRoutes(app: Express) {
         Dedication: body.score_dedication,
       };
       const avgScore = Object.values(scores).reduce((a, b) => a + b, 0) / 6;
-      supabase
-        .from("coaches")
-        .select("first_name, last_name, email")
-        .eq("id", body.coach_id)
-        .single()
-        .then(({ data: coach }) => {
-          const name = coach
-            ? `${coach.first_name} ${coach.last_name}`
-            : `Coach #${body.coach_id}`;
-          sendAdminAlert("review", {
-            Coach: name,
-            "Avg Score": `${avgScore.toFixed(1)} / 5.0`,
-            Excerpt: (body.body || "No written review").substring(0, 120),
-          });
-          // Coach email alerts disabled for now
-          // if (coach?.email) {
-          //   sendCoachAlert(coach.email, coach.first_name, scores, body.coach_id);
-          // }
-        })
-        .catch(() => {});
+      Promise.resolve(
+        supabase.from("coaches").select("first_name, last_name, email").eq("id", body.coach_id).single()
+      ).then(({ data: coach }) => {
+        const name = coach ? `${coach.first_name} ${coach.last_name}` : `Coach #${body.coach_id}`;
+        sendAdminAlert("review", {
+          Coach: name,
+          "Avg Score": `${avgScore.toFixed(1)} / 5.0`,
+          Excerpt: (body.body || "No written review").substring(0, 120),
+        });
+      }).catch(() => {});
 
       return res.json(data);
     } catch (err: any) {
@@ -157,7 +147,7 @@ export function registerReviewRoutes(app: Express) {
         .delete()
         .eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
-      await logAudit(supabase, "delete", "review", [req.params.id]);
+      await logAudit(supabase, "delete", "review", [String(req.params.id)]);
       return res.json({ ok: true });
     } catch {
       return res.status(500).json({ error: "Server error" });

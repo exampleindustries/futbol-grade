@@ -352,7 +352,7 @@ export function registerEventRoutes(app: Express) {
         .delete()
         .eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
-      await logAudit(supabase, "delete", "event", [req.params.id]);
+      await logAudit(supabase, "delete", "event", [String(req.params.id)]);
       return res.json({ ok: true });
     } catch {
       return res.status(500).json({ error: "Server error" });
