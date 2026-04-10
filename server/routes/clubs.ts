@@ -183,19 +183,35 @@ export function registerClubRoutes(app: Express) {
       const toProcess = clubLinks.filter(c => !existingNames.has(c.name.toLowerCase().trim())).slice(0, batch);
       if (!toProcess.length) return res.json({ ok: true, message: `All ${clubLinks.length} GotSport clubs already exist in DB`, total: clubLinks.length });
 
-      let clubsCreated = 0, clubsUpdated = 0, coachesCreated = 0;
+      const storeLogo = async (id: string, imgUrl: string): Promise<string | null> => {
+        try {
+          const imgR = await fetch(imgUrl, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
+          if (!imgR.ok) return null;
+          const buf = Buffer.from(await imgR.arrayBuffer());
+          const ext = imgUrl.match(/\.(png|jpg|jpeg|webp|svg)/i)?.[1] || "png";
+          await supabase.storage.from("club-logos").upload(`${id}.${ext}`, buf, {
+            upsert: true,
+            contentType: `image/${ext === "jpg" ? "jpeg" : ext}`,
+          });
+          const { data: pu } = supabase.storage.from("club-logos").getPublicUrl(`${id}.${ext}`);
+          return pu.publicUrl;
+        } catch { return null; }
+      };
+
+      let clubsCreated = 0;
+      let clubsUpdated = 0;
+      let coachesCreated = 0;
       const log: string[] = [];
 
       for (const clubEntry of toProcess) {
-        // ── Step 2: get team list for this club ────────────────
+        // ── Step 2: get team list for this club ──────────────
         const clubHtml = await fetchHtml(clubEntry.url);
         if (!clubHtml) { log.push(`SKIP ${clubEntry.name}: could not fetch`); continue; }
 
-        // Parse team links: look for links to team/schedule pages
         const teamLinkRe = /href="(\/org_event\/events\/43086\/schedule[^"]*team_id=(\d+)[^"]*)"[^>]*>/gi;
         const altTeamRe = /href="([^"]*\/teams?\/(\d+)[^"]*)"[^>]*>/gi;
-        const teamLinks: { url: string; id: string }[] = [];
-        let tm;
+        const teamLinks: Array<{ url: string; id: string }> = [];
+        let tm: RegExpExecArray | null;
         while ((tm = teamLinkRe.exec(clubHtml)) !== null) {
           if (!teamLinks.find(t => t.id === tm![2])) teamLinks.push({ url: `${BASE}${tm[1]}`, id: tm[2] });
         }
@@ -205,40 +221,28 @@ export function registerClubRoutes(app: Express) {
           }
         }
 
-        // ── Step 3: find club logo + coaches from team pages ───
+        // ── Step 3: logo + coaches from team pages ───────────
         let logoImgUrl: string | null = null;
-        const coaches: { firstName: string; lastName: string; gender: string; ageGroup: string }[] = [];
+        const coaches: Array<{ firstName: string; lastName: string; gender: string; ageGroup: string }> = [];
 
-        for (const team of teamLinks.slice(0, 20)) { // max 20 teams per club
+        for (const team of teamLinks.slice(0, 20)) {
           const teamHtml = await fetchHtml(team.url);
           if (!teamHtml) continue;
 
-          // Grab logo from first team that has one
           if (!logoImgUrl) {
-            const imgRe = /<img[^>]+src="([^"]+)"[^>]*(?:class|alt)="[^"]*(?:logo|crest|badge|club)[^"]*"/i;
-            const imgRe2 = /class="[^"]*(?:logo|crest|badge|team-img)[^"]*"[^>]*src="([^"]+)"/i;
-            const logoMatch = imgRe.exec(teamHtml) || imgRe2.exec(teamHtml);
-            // Also try: first <img> near the coach name block
-            const nearCoachImg = /<img[^>]+src="(https?:\/\/[^"]+(?:png|jpg|jpeg|webp|svg)[^"]*)"[^>]*>/i;
-            if (logoMatch) {
-              logoImgUrl = logoMatch[1].startsWith("http") ? logoMatch[1] : `${BASE}${logoMatch[1]}`;
-            } else {
-              const ncm = nearCoachImg.exec(teamHtml);
-              if (ncm) logoImgUrl = ncm[1];
-            }
+            const m1 = /<img[^>]+src="([^"]+)"[^>]*(?:class|alt)="[^"]*(?:logo|crest|badge|club)[^"]*"/i.exec(teamHtml)
+              || /class="[^"]*(?:logo|crest|badge|team-img)[^"]*"[^>]*src="([^"]+)"/i.exec(teamHtml)
+              || /<img[^>]+src="(https?:\/\/[^"]+(?:png|jpg|jpeg|webp|svg)[^"]*)"[^>]*>/i.exec(teamHtml);
+            if (m1) logoImgUrl = m1[1].startsWith("http") ? m1[1] : `${BASE}${m1[1]}`;
           }
 
-          // Parse gender + age from team name or table cell
-          // Team name format: "Club Name ABBR GXX Gender" e.g. "City SC Southwest CITY SC SW G18 Premier LE"
-          // Age column has "U8", "U9" etc; Gender column has "Female"/"Male"
           const ageMatch = teamHtml.match(/\b(U\d+)\b/i);
           const genderMatch = teamHtml.match(/\b(Female|Male)\b/i);
           const ageGroup = ageMatch ? ageMatch[1].toUpperCase() : "";
           const gender = genderMatch ? (genderMatch[1] === "Female" ? "girls" : "boys") : "coed";
 
-          // Parse coaches: "Coach: First Last" pattern
           const coachRe = /Coach:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g;
-          let coachMatch;
+          let coachMatch: RegExpExecArray | null;
           while ((coachMatch = coachRe.exec(teamHtml)) !== null) {
             const parts = coachMatch[1].trim().split(/\s+/);
             if (parts.length >= 2) {
@@ -251,53 +255,38 @@ export function registerClubRoutes(app: Express) {
           }
         }
 
-        // ── Step 4: upsert club ────────────────────────────────
-        async function storeLogoForClub(id: string): Promise<string | null> {
-          if (!logoImgUrl) return null;
-          try {
-            const imgR = await fetch(logoImgUrl!, { headers: HEADERS, signal: AbortSignal.timeout(10000) });
-            if (!imgR.ok) return null;
-            const buf = Buffer.from(await imgR.arrayBuffer());
-            const ext = logoImgUrl!.match(/\.(png|jpg|jpeg|webp|svg)/i)?.[1] || "png";
-            await supabase.storage.from("club-logos").upload(`${id}.${ext}`, buf, { upsert: true, contentType: `image/${ext === "jpg" ? "jpeg" : ext}` });
-            const { data: pu } = supabase.storage.from("club-logos").getPublicUrl(`${id}.${ext}`);
-            return pu.publicUrl;
-          } catch { return null; }
-        }
-
-        let clubId: string = "";
-        // Club already exists in DB (matched by name earlier, but now we look up by name for id)
+        // ── Step 4: upsert club ──────────────────────────────
         const { data: matchedClub } = await supabase
           .from("clubs").select("id, logo_url").eq("name", clubEntry.name).maybeSingle();
 
+        let clubId = "";
         if (matchedClub) {
-          const updates: any = {};
-          if (logoImgUrl && !matchedClub.logo_url) {
-            const stored = await storeLogoForClub(matchedClub.id);
-            if (stored) updates.logo_url = stored;
-          }
-          if (Object.keys(updates).length) await supabase.from("clubs").update(updates).eq("id", matchedClub.id);
           clubId = matchedClub.id;
+          if (logoImgUrl && !matchedClub.logo_url) {
+            const stored = await storeLogo(clubId, logoImgUrl);
+            if (stored) await supabase.from("clubs").update({ logo_url: stored }).eq("id", clubId);
+          }
           clubsUpdated++;
           log.push(`UPDATED ${clubEntry.name} (${coaches.length} coaches)`);
         } else {
-          // Create new club as pending
           const { data: ins } = await supabase.from("clubs")
             .insert({ name: clubEntry.name, status: "pending" }).select("id").single();
           if (ins) {
             clubId = ins.id;
-            const stored = await storeLogoForClub(clubId);
-            if (stored) await supabase.from("clubs").update({ logo_url: stored }).eq("id", clubId);
+            if (logoImgUrl) {
+              const stored = await storeLogo(clubId, logoImgUrl);
+              if (stored) await supabase.from("clubs").update({ logo_url: stored }).eq("id", clubId);
+            }
           }
           clubsCreated++;
           log.push(`CREATED ${clubEntry.name} (${coaches.length} coaches)`);
         }
 
-        // ── Step 5: upsert coaches ─────────────────────────────
+        // ── Step 5: upsert coaches ───────────────────────────
+        if (!clubId) continue;
         for (const coach of coaches) {
           const { data: existing } = await supabase
-            .from("coaches")
-            .select("id")
+            .from("coaches").select("id")
             .eq("first_name", coach.firstName)
             .eq("last_name", coach.lastName)
             .eq("club_id", clubId)
