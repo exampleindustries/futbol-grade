@@ -79,7 +79,7 @@ async function scanClubWebsitesForEvents(
               homeHtml.match(
                 /<img[^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i
               );
-            if (logoImgMatch) logoUrl = logoImgMatch[1] || logoImgMatch[2];
+            if (logoImgMatch) logoUrl = logoImgMatch[1];
           }
 
           if (logoUrl) {
@@ -286,7 +286,7 @@ export function registerEventRoutes(app: Express) {
         Title: title,
         "Event Date": event_date,
         Description: description || "(none)",
-      });
+      }).catch(() => {});
 
       return res.status(201).json(data);
     } catch {

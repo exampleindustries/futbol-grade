@@ -107,7 +107,7 @@ export function registerAdminRoutes(app: Express) {
 
       const [emailsRes, reviewCounts, listingCounts] = await Promise.all([
         supabase.rpc("get_user_emails", { user_ids: ids }),
-        supabase.from("reviews").select("user_id").in("user_id", ids),
+        supabase.from("reviews").select("reviewer_id").in("reviewer_id", ids),
         supabase.from("listings").select("user_id").in("user_id", ids),
       ]);
 
@@ -116,7 +116,7 @@ export function registerAdminRoutes(app: Express) {
       );
       const reviewMap = new Map<string, number>();
       (reviewCounts.data || []).forEach((r: any) =>
-        reviewMap.set(r.user_id, (reviewMap.get(r.user_id) || 0) + 1)
+        reviewMap.set(r.reviewer_id, (reviewMap.get(r.reviewer_id) || 0) + 1)
       );
       const listingMap = new Map<string, number>();
       (listingCounts.data || []).forEach((l: any) =>
