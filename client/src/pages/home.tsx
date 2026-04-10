@@ -347,6 +347,8 @@ export default function Home() {
   const [showAgeModal, setShowAgeModal] = useState(false)
   const [showRegionModal, setShowRegionModal] = useState(false)
   const [sponsors, setSponsors] = useState<Sponsor[]>([])
+  const sponsorSectionRef = useRef<HTMLDivElement>(null)
+  const impressionTracked = useRef(false)
 
   useEffect(() => {
     async function load() {
@@ -371,6 +373,25 @@ export default function Home() {
       { timeout: 5000 }
     )
   }, [])
+
+  // Track sponsor impressions when section scrolls into view
+  useEffect(() => {
+    if (sponsors.length === 0 || impressionTracked.current) return
+    const el = sponsorSectionRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !impressionTracked.current) {
+        impressionTracked.current = true
+        fetch(`${API}/api/sponsors/track`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sponsor_ids: sponsors.map(s => s.id), event_type: 'impression' })
+        }).catch(() => {})
+        observer.disconnect()
+      }
+    }, { threshold: 0.3 })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [sponsors])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -622,7 +643,7 @@ export default function Home() {
 
       {/* Sponsors */}
       {sponsors.length > 0 && (
-        <section className="py-12 border-t" style={{ borderColor: 'var(--fg-border)', background: 'var(--fg-surface)' }}>
+        <section ref={sponsorSectionRef} className="py-12 border-t" style={{ borderColor: 'var(--fg-border)', background: 'var(--fg-surface)' }}>
           <div className="max-w-6xl mx-auto px-6">
             <div className="text-center mb-8">
               <span className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Proudly Supported By</span>
@@ -631,6 +652,12 @@ export default function Home() {
             <div className="flex flex-wrap justify-center gap-6">
               {sponsors.map(s => (
                 <a key={s.id} href={s.website || '#'} target="_blank" rel="noopener noreferrer"
+                  onClick={() => {
+                    fetch(`${API}/api/sponsors/track`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ sponsor_ids: [s.id], event_type: 'click' })
+                    }).catch(() => {})
+                  }}
                   className="flex flex-col items-center gap-3 px-6 py-5 bg-white border rounded-2xl hover:shadow-lg transition-all"
                   style={{ borderColor: s.is_main_sponsor ? 'var(--fg-green)' : 'var(--fg-border)', minWidth: 160 }}
                   data-testid={`sponsor-${s.id}`}>

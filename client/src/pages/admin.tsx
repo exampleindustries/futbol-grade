@@ -81,8 +81,16 @@ interface AdminSponsor {
   total_spent: number
   contact_name: string | null
   contact_email: string | null
+  impressions: number
+  clicks: number
   created_at: string
   updated_at: string
+}
+
+interface SponsorDailyAnalytics {
+  date: string
+  impressions: number
+  clicks: number
 }
 
 interface AdminClub {
@@ -164,6 +172,8 @@ export default function Admin() {
   const [editingSponsor, setEditingSponsor] = useState<string | null>(null)
   const [sponsorEdits, setSponsorEdits] = useState<Record<string, any>>({})
   const [showAddSponsor, setShowAddSponsor] = useState(false)
+  const [sponsorAnalytics, setSponsorAnalytics] = useState<Record<string, SponsorDailyAnalytics[]>>({})
+  const [expandedSponsorAnalytics, setExpandedSponsorAnalytics] = useState<string | null>(null)
   const [newSponsor, setNewSponsor] = useState<Record<string, any>>({ name: '', is_active: true, is_main_sponsor: false, radius_miles: 25, total_spent: 0 })
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(false)
@@ -1714,6 +1724,34 @@ export default function Admin() {
         {/* Sponsors tab */}
         {tab === 'sponsors' && (
           <>
+            {/* Analytics Summary */}
+            {adminSponsors.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                <div className="bg-white border rounded-xl p-4" style={{ borderColor: 'var(--fg-border)' }}>
+                  <div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Total Sponsors</div>
+                  <div className="font-bebas text-2xl mt-1" style={{ color: 'var(--fg-text)' }}>{adminSponsors.length}</div>
+                  <div className="font-mono text-[10px]" style={{ color: 'var(--fg-green)' }}>{adminSponsors.filter(s => s.is_active).length} active</div>
+                </div>
+                <div className="bg-white border rounded-xl p-4" style={{ borderColor: 'var(--fg-border)' }}>
+                  <div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Total Impressions</div>
+                  <div className="font-bebas text-2xl mt-1" style={{ color: 'var(--fg-text)' }}>{adminSponsors.reduce((sum, s) => sum + (s.impressions || 0), 0).toLocaleString()}</div>
+                  <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>lifetime across all</div>
+                </div>
+                <div className="bg-white border rounded-xl p-4" style={{ borderColor: 'var(--fg-border)' }}>
+                  <div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Total Clicks</div>
+                  <div className="font-bebas text-2xl mt-1" style={{ color: 'var(--fg-text)' }}>{adminSponsors.reduce((sum, s) => sum + (s.clicks || 0), 0).toLocaleString()}</div>
+                  <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>lifetime across all</div>
+                </div>
+                <div className="bg-white border rounded-xl p-4" style={{ borderColor: 'var(--fg-border)' }}>
+                  <div className="font-mono text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--fg-muted)' }}>Total Ad Revenue</div>
+                  <div className="font-bebas text-2xl mt-1" style={{ color: 'var(--fg-green)' }}>${adminSponsors.reduce((sum, s) => sum + Number(s.total_spent || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  <div className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>
+                    {(() => { const totalClicks = adminSponsors.reduce((sum, s) => sum + (s.clicks || 0), 0); const totalSpent = adminSponsors.reduce((sum, s) => sum + Number(s.total_spent || 0), 0); return totalClicks > 0 ? `$${(totalSpent / totalClicks).toFixed(2)} per click` : 'no clicks yet' })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-4">
               <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--fg-muted)' }}>{adminSponsors.length} sponsors</span>
               <button onClick={() => { setShowAddSponsor(!showAddSponsor); setNewSponsor({ name: '', is_active: true, is_main_sponsor: false, radius_miles: 25, total_spent: 0 }) }}
@@ -1824,8 +1862,44 @@ export default function Admin() {
                             {s.contact_email && <span className="font-mono text-[10px]" style={{ color: 'var(--fg-muted)' }}>{s.contact_email}</span>}
                           </div>
                         </div>
+                        {/* Analytics inline */}
+                        <div className="flex items-center gap-4 flex-shrink-0 mr-4">
+                          <div className="text-center">
+                            <div className="font-bebas text-lg" style={{ color: 'var(--fg-text)' }}>{(s.impressions || 0).toLocaleString()}</div>
+                            <div className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>views</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bebas text-lg" style={{ color: 'var(--fg-text)' }}>{(s.clicks || 0).toLocaleString()}</div>
+                            <div className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>clicks</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-bebas text-lg" style={{ color: (s.impressions || 0) > 0 ? 'var(--fg-green)' : 'var(--fg-muted)' }}>
+                              {(s.impressions || 0) > 0 ? ((s.clicks || 0) / (s.impressions || 1) * 100).toFixed(1) + '%' : '-'}
+                            </div>
+                            <div className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>CTR</div>
+                          </div>
+                          {Number(s.total_spent) > 0 && (s.clicks || 0) > 0 && (
+                            <div className="text-center">
+                              <div className="font-bebas text-lg" style={{ color: 'var(--fg-green)' }}>${(Number(s.total_spent) / (s.clicks || 1)).toFixed(2)}</div>
+                              <div className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>CPC</div>
+                            </div>
+                          )}
+                        </div>
                         {/* Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          <button onClick={async () => {
+                            if (expandedSponsorAnalytics === s.id) { setExpandedSponsorAnalytics(null); return }
+                            setExpandedSponsorAnalytics(s.id)
+                            if (!sponsorAnalytics[s.id]) {
+                              const auth = await getAuthHeader()
+                              const res = await fetch(`${getApiBase()}/api/admin/sponsors/${s.id}/analytics?days=30`, { headers: { Authorization: auth } })
+                              if (res.ok) { const data = await res.json(); setSponsorAnalytics(prev => ({ ...prev, [s.id]: data })) }
+                            }
+                          }} className="font-mono text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all"
+                            style={{ borderColor: 'var(--fg-border2)', color: 'var(--fg-green)' }}
+                            data-testid={`analytics-sponsor-${s.id}`}>
+                            {expandedSponsorAnalytics === s.id ? 'Hide' : '30d'}
+                          </button>
                           <button onClick={async () => {
                             const auth = await getAuthHeader()
                             await fetch(`${getApiBase()}/api/admin/sponsors/${s.id}`, {
@@ -1854,6 +1928,63 @@ export default function Admin() {
                             data-testid={`delete-sponsor-${s.id}`}>Delete</button>
                         </div>
                       </div>
+
+                      {/* 30-day Analytics Panel */}
+                      {expandedSponsorAnalytics === s.id && (
+                        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--fg-border)' }}>
+                          <div className="font-mono text-[10px] font-bold tracking-widest uppercase mb-3" style={{ color: 'var(--fg-muted)' }}>Last 30 Days</div>
+                          {!sponsorAnalytics[s.id] ? (
+                            <div className="h-20 animate-pulse rounded-lg" style={{ background: 'var(--fg-surface)' }} />
+                          ) : sponsorAnalytics[s.id].length === 0 ? (
+                            <div className="font-mono text-xs py-4 text-center" style={{ color: 'var(--fg-muted)' }}>No data yet — impressions will appear once the sponsor section is viewed by visitors.</div>
+                          ) : (
+                            <>
+                              {/* Mini bar chart */}
+                              <div className="flex items-end gap-[2px] h-20 mb-3">
+                                {(() => {
+                                  const data = sponsorAnalytics[s.id]
+                                  const maxVal = Math.max(...data.map(d => d.impressions), 1)
+                                  return data.map((d, i) => (
+                                    <div key={i} className="flex-1 flex flex-col items-center gap-[1px]" title={`${d.date}: ${d.impressions} views, ${d.clicks} clicks`}>
+                                      <div className="w-full rounded-t" style={{ height: `${Math.max((d.impressions / maxVal) * 100, 2)}%`, background: 'var(--fg-green)', opacity: 0.3 }} />
+                                      <div className="w-full rounded-t" style={{ height: `${Math.max((d.clicks / maxVal) * 100, d.clicks > 0 ? 4 : 0)}%`, background: 'var(--fg-green)' }} />
+                                    </div>
+                                  ))
+                                })()}
+                              </div>
+                              <div className="flex items-center gap-4 mb-2">
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: 'var(--fg-green)', opacity: 0.3 }} /><span className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>Impressions</span></span>
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: 'var(--fg-green)' }} /><span className="font-mono text-[9px]" style={{ color: 'var(--fg-muted)' }}>Clicks</span></span>
+                              </div>
+                              {/* Daily table */}
+                              <div className="max-h-48 overflow-y-auto">
+                                <table className="w-full">
+                                  <thead>
+                                    <tr className="font-mono text-[9px] font-bold uppercase" style={{ color: 'var(--fg-muted)' }}>
+                                      <th className="text-left py-1 pr-3">Date</th>
+                                      <th className="text-right py-1 px-3">Impressions</th>
+                                      <th className="text-right py-1 px-3">Clicks</th>
+                                      <th className="text-right py-1 pl-3">CTR</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {[...sponsorAnalytics[s.id]].reverse().map(d => (
+                                      <tr key={d.date} className="font-mono text-[11px] border-t" style={{ borderColor: 'var(--fg-border)', color: 'var(--fg-text2)' }}>
+                                        <td className="py-1.5 pr-3">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                                        <td className="text-right py-1.5 px-3">{d.impressions.toLocaleString()}</td>
+                                        <td className="text-right py-1.5 px-3">{d.clicks.toLocaleString()}</td>
+                                        <td className="text-right py-1.5 pl-3 font-semibold" style={{ color: 'var(--fg-green)' }}>
+                                          {d.impressions > 0 ? ((d.clicks / d.impressions) * 100).toFixed(1) + '%' : '-'}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
 
                       {/* Inline Edit */}
                       {isEditing && (

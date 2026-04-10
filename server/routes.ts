@@ -1445,5 +1445,70 @@ export async function registerRoutes(
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
+  // ── Sponsor Analytics: Track impressions & clicks ───────────
+
+  const sponsorTrackLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests." },
+  });
+
+  app.post("/api/sponsors/track", sponsorTrackLimiter, async (req, res) => {
+    try {
+      const supabase = getSupabaseClient();
+      const { sponsor_ids, event_type } = req.body;
+      if (!Array.isArray(sponsor_ids) || sponsor_ids.length === 0) return res.status(400).json({ error: "sponsor_ids required" });
+      if (event_type !== "impression" && event_type !== "click") return res.status(400).json({ error: "event_type must be impression or click" });
+      const col = event_type === "impression" ? "impressions" : "clicks";
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Upsert daily rows + increment lifetime counters
+      for (const sid of sponsor_ids.slice(0, 50)) {
+        // Daily analytics: upsert
+        await supabase.rpc("increment_sponsor_analytics", {
+          p_sponsor_id: sid,
+          p_date: today,
+          p_col: col,
+        }).then(() => {}).catch(() => {
+          // Fallback: try insert then update
+          supabase.from("sponsor_analytics").upsert(
+            { sponsor_id: sid, date: today, [col]: 1 },
+            { onConflict: "sponsor_id,date" }
+          ).then(() => {});
+        });
+
+        // Lifetime counter on sponsors table
+        await supabase.rpc("increment_sponsor_counter", {
+          p_sponsor_id: sid,
+          p_col: col,
+        }).catch(() => {});
+      }
+
+      return res.json({ ok: true });
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
+  // Admin: get sponsor analytics (daily breakdown)
+  app.get("/api/admin/sponsors/:id/analytics", async (req, res) => {
+    try {
+      const supabase = await requireAdmin(req, res);
+      if (!supabase) return;
+      const days = Math.min(parseInt(req.query.days as string) || 30, 90);
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+
+      const { data, error } = await supabase
+        .from("sponsor_analytics")
+        .select("date, impressions, clicks")
+        .eq("sponsor_id", req.params.id)
+        .gte("date", since.toISOString().slice(0, 10))
+        .order("date", { ascending: true });
+      if (error) return res.status(400).json({ error: error.message });
+      return res.json(data);
+    } catch { return res.status(500).json({ error: "Server error" }); }
+  });
+
   return httpServer;
 }
