@@ -47,7 +47,7 @@ export default function Profile() {
       alias, alias_emoji: aliasEmoji,
       prefer_anonymous: preferAnon,
       updated_at: new Date().toISOString(),
-    }).eq('id', user.id)
+    }).eq('id', user!.id)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)

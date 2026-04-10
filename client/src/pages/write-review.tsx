@@ -102,7 +102,7 @@ export default function WriteReview() {
       const session = await supabase.auth.getSession()
       const token = session.data.session?.access_token
       await apiRequest('POST', '/api/reviews', {
-        coach_id: coach.id,
+        coach_id: coach!.id,
         is_anonymous: isAnon,
         display_name: displayName,
         player_position: position || undefined,

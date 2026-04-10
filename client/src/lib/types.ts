@@ -71,6 +71,8 @@ export interface Coach {
   total_reviews: number
   approved_by: string | null
   approved_at: string | null
+  gender: string | null
+  specialization: string | null
   created_at: string
   updated_at: string
   // Joined

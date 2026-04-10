@@ -42,12 +42,13 @@ function abbreviate(name: string) {
   return words.map(w => w[0]).join('').slice(0, 4).toUpperCase()
 }
 
-export function ClubBadge({ clubName, logoUrl, size = 'md' }: { clubName?: string | null; logoUrl?: string | null; size?: 'sm' | 'md' | 'lg' }) {
+export function ClubBadge({ clubName, logoUrl, size = 'md' }: { clubName?: string | null; logoUrl?: string | null; size?: 'xs' | 'sm' | 'md' | 'lg' }) {
   const name = clubName || 'Club'
   const color = CLUB_COLORS[name] || FALLBACK_COLORS[hashName(name) % FALLBACK_COLORS.length]
   const abbr = abbreviate(name)
 
   const sizes = {
+    xs: 'w-6 h-6 text-[7px]',
     sm: 'w-8 h-8 text-[9px]',
     md: 'w-12 h-12 text-[11px]',
     lg: 'w-14 h-14 text-sm',

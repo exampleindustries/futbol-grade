@@ -386,24 +386,20 @@ export async function registerRoutes(
         Dedication: body.score_dedication,
       };
       const avgScore = Object.values(scores).reduce((a, b) => a + b, 0) / 6;
-      supabase
-        .from("coaches")
-        .select("first_name, last_name, email")
-        .eq("id", body.coach_id)
-        .single()
-        .then(({ data: coach }) => {
+      Promise.resolve(
+        supabase
+          .from("coaches")
+          .select("first_name, last_name, email")
+          .eq("id", body.coach_id)
+          .single()
+      ).then(({ data: coach }) => {
           const name = coach ? `${coach.first_name} ${coach.last_name}` : `Coach #${body.coach_id}`;
           sendAdminAlert("review", {
             Coach: name,
             "Avg Score": `${avgScore.toFixed(1)} / 5.0`,
             Excerpt: (body.body || "No written review").substring(0, 120),
           });
-          // Coach email alerts disabled for now
-          // if (coach?.email) {
-          //   sendCoachAlert(coach.email, coach.first_name, scores, body.coach_id);
-          // }
-        })
-        .catch(() => {});
+        }).catch(() => {});
 
       return res.json(data);
     } catch (err: any) {
@@ -556,8 +552,8 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("reviews").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "delete", "review", [req.params.id as string]);
       return res.json({ ok: true });
-      await logAudit(supabase, "delete", "review", [req.params.id]);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -606,8 +602,8 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("listings").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "delete", "listing", [req.params.id as string]);
       return res.json({ ok: true });
-      await logAudit(supabase, "delete", "listing", [req.params.id]);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -625,8 +621,8 @@ export async function registerRoutes(
         const { error } = await supabase.from("listings").update({ status, approved_at: new Date().toISOString() }).in("id", ids);
         if (error) return res.status(400).json({ error: error.message });
       }
-      return res.json({ ok: true });
       await logAudit(supabase, status === "delete" ? "bulk_delete" : "bulk_status_change", "listing", ids, { new_status: status });
+      return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -750,8 +746,8 @@ export async function registerRoutes(
         const { error } = await supabase.from("coaches").update({ status }).in("id", ids);
         if (error) return res.status(400).json({ error: error.message });
       }
-      return res.json({ ok: true });
       await logAudit(supabase, status === "delete" ? "bulk_delete" : "bulk_status_change", "coach", ids, { new_status: status });
+      return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -761,8 +757,8 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("coaches").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
+      await logAudit(supabase, "delete", "coach", [req.params.id as string]);
       return res.json({ ok: true });
-      await logAudit(supabase, "delete", "coach", [req.params.id]);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
 
@@ -831,7 +827,7 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("coach_claims").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
-      await logAudit(supabase, "delete", "claim", [req.params.id]);
+      await logAudit(supabase, "delete", "claim", [req.params.id as string]);
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
@@ -967,7 +963,7 @@ export async function registerRoutes(
       if (error) return res.status(400).json({ error: error.message });
 
       // Haversine distance in miles
-      function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
+      const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
         const R = 3959;
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -1082,7 +1078,7 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("events").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
-      await logAudit(supabase, "delete", "event", [req.params.id]);
+      await logAudit(supabase, "delete", "event", [req.params.id as string]);
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
@@ -1429,7 +1425,7 @@ export async function registerRoutes(
       for (const k of allowed) if (req.body[k] !== undefined) fields[k] = req.body[k];
       const { data, error } = await supabase.from("sponsors").update(fields).eq("id", req.params.id).select().single();
       if (error) return res.status(400).json({ error: error.message });
-      await logAudit(supabase, "update", "sponsor", [req.params.id]);
+      await logAudit(supabase, "update", "sponsor", [req.params.id as string]);
       return res.json(data);
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
@@ -1440,7 +1436,7 @@ export async function registerRoutes(
       if (!supabase) return;
       const { error } = await supabase.from("sponsors").delete().eq("id", req.params.id);
       if (error) return res.status(400).json({ error: error.message });
-      await logAudit(supabase, "delete", "sponsor", [req.params.id]);
+      await logAudit(supabase, "delete", "sponsor", [req.params.id as string]);
       return res.json({ ok: true });
     } catch { return res.status(500).json({ error: "Server error" }); }
   });
@@ -1467,23 +1463,27 @@ export async function registerRoutes(
       // Upsert daily rows + increment lifetime counters
       for (const sid of sponsor_ids.slice(0, 50)) {
         // Daily analytics: upsert
-        await supabase.rpc("increment_sponsor_analytics", {
-          p_sponsor_id: sid,
-          p_date: today,
-          p_col: col,
-        }).then(() => {}).catch(() => {
+        try {
+          await supabase.rpc("increment_sponsor_analytics", {
+            p_sponsor_id: sid,
+            p_date: today,
+            p_col: col,
+          });
+        } catch {
           // Fallback: try insert then update
-          supabase.from("sponsor_analytics").upsert(
+          await supabase.from("sponsor_analytics").upsert(
             { sponsor_id: sid, date: today, [col]: 1 },
             { onConflict: "sponsor_id,date" }
-          ).then(() => {});
-        });
+          );
+        }
 
         // Lifetime counter on sponsors table
-        await supabase.rpc("increment_sponsor_counter", {
-          p_sponsor_id: sid,
-          p_col: col,
-        }).catch(() => {});
+        try {
+          await supabase.rpc("increment_sponsor_counter", {
+            p_sponsor_id: sid,
+            p_col: col,
+          });
+        } catch { /* ignore */ }
       }
 
       return res.json({ ok: true });
