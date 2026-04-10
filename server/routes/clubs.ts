@@ -319,7 +319,7 @@ export function registerClubRoutes(app: Express) {
       return res.json({
         ok: true,
         clubsTotal: clubLinks.length,
-        remaining: clubLinks.filter(c => !importedIds.has(c.gsId)).length - toProcess.length,
+        remaining: clubLinks.filter(c => !existingNames.has(c.name.toLowerCase().trim())).length - toProcess.length,
         clubsCreated,
         clubsUpdated,
         coachesCreated,
