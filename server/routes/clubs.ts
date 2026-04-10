@@ -10,7 +10,7 @@ export function registerClubRoutes(app: Express) {
       const supabase = getSupabaseClient();
       const { data, error } = await supabase
         .from("clubs")
-        .select("id, name, city, state, logo_url, lat, lng, avg_overall, website")
+        .select("id, name, city, state, logo_url, lat, lng, avg_overall, website, coach_count")
         .eq("status", "approved")
         .not("lat", "is", null);
       if (error) return res.status(400).json({ error: error.message });

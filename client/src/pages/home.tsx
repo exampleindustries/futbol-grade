@@ -385,28 +385,43 @@ function ClubMap() {
         pane: 'shadowPane',
       }).addTo(map)
 
+      const maxCoaches = Math.max(1, ...clubs.map((c: any) => c.coach_count || 0))
+
       clubs.forEach((club: any) => {
         if (!club.lat || !club.lng) return
         const { fill, stroke, solid } = clubColor(club.id)
+        const coachCount = club.coach_count || 0
 
-        // Soft colored glow circle for each club's area
+        // Scale circle radius and pin size by coach count (min 5km, max 14km)
+        const ratio = coachCount / maxCoaches
+        const radius = 5000 + ratio * 9000
+        const pinSize = Math.round(36 + ratio * 22) // 36px → 58px
+        const fontSize = Math.round(11 + ratio * 5)
+        const borderWidth = coachCount > 0 ? 3 : 2
+
+        // Glow circle — bigger = more coaches
         L.circle([club.lat, club.lng], {
-          radius: 8000,
+          radius,
           color: stroke,
           fillColor: fill,
           fillOpacity: 1,
-          weight: 1.5,
-          opacity: 0.6,
+          weight: coachCount > 0 ? 2 : 1,
+          opacity: 0.5 + ratio * 0.3,
         }).addTo(map)
 
-        // Logo / initial pin on top
+        // Pin — scales with coach count
+        const half = Math.round(pinSize / 2)
         const icon = L.divIcon({
           className: '',
           html: club.logo_url
-            ? `<div style="width:38px;height:38px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);overflow:hidden;background:#fff"><img src="${club.logo_url}" style="width:100%;height:100%;object-fit:contain" /></div>`
-            : `<div style="width:38px;height:38px;border-radius:50%;background:${solid};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-family:sans-serif">${club.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}</div>`,
-          iconSize: [38, 38],
-          iconAnchor: [19, 19],
+            ? `<div style="width:${pinSize}px;height:${pinSize}px;border-radius:50%;border:${borderWidth}px solid #fff;box-shadow:0 ${2 + ratio * 4}px ${8 + ratio * 12}px rgba(0,0,0,${0.2 + ratio * 0.2});overflow:hidden;background:#fff">
+                <img src="${club.logo_url}" style="width:100%;height:100%;object-fit:contain" />
+               </div>`
+            : `<div style="width:${pinSize}px;height:${pinSize}px;border-radius:50%;background:${solid};border:${borderWidth}px solid #fff;box-shadow:0 ${2 + ratio * 4}px ${8 + ratio * 12}px rgba(0,0,0,${0.2 + ratio * 0.2});display:flex;align-items:center;justify-content:center;color:#fff;font-size:${fontSize}px;font-weight:700;font-family:sans-serif">
+                ${club.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
+               </div>`,
+          iconSize: [pinSize, pinSize],
+          iconAnchor: [half, half],
         })
 
         const marker = L.marker([club.lat, club.lng], { icon }).addTo(map)
@@ -415,7 +430,8 @@ function ClubMap() {
             ${club.logo_url ? `<img src="${club.logo_url}" style="width:44px;height:44px;object-fit:contain;border-radius:8px;margin-bottom:6px;display:block" />` : ''}
             <div style="font-weight:700;font-size:13px;color:#111">${club.name}</div>
             <div style="color:#888;font-size:11px;margin-top:2px">${[club.city, club.state].filter(Boolean).join(', ')}</div>
-            ${club.avg_overall > 0 ? `<div style="color:#16a34a;font-size:11px;margin-top:4px;font-weight:600">★ ${Number(club.avg_overall).toFixed(1)}</div>` : ''}
+            ${coachCount > 0 ? `<div style="color:#555;font-size:11px;margin-top:3px">${coachCount} coach${coachCount !== 1 ? 'es' : ''}</div>` : ''}
+            ${club.avg_overall > 0 ? `<div style="color:#16a34a;font-size:11px;margin-top:3px;font-weight:600">★ ${Number(club.avg_overall).toFixed(1)}</div>` : ''}
             <a href="/clubs/${club.id}" style="display:inline-block;margin-top:8px;font-size:11px;color:#16a34a;font-weight:600;text-decoration:none">View Club →</a>
           </div>
         `, { maxWidth: 200 })
