@@ -165,10 +165,13 @@ export function registerClubRoutes(app: Express) {
       // Parse club rows: <a href="/org_event/events/43086/clubs/XXXX">Club Name</a>
       const clubLinkRe = /href="(\/org_event\/events\/43086\/clubs\/(\d+)[^"]*)"[^>]*>\s*([^<]+?)\s*</gi;
       const clubLinks: { url: string; gsId: string; name: string }[] = [];
+      const seenNames = new Set<string>();
       let cm;
       while ((cm = clubLinkRe.exec(clubsHtml)) !== null) {
         const name = cm[3].trim();
-        if (name && !clubLinks.find(c => c.gsId === cm![2])) {
+        const nameKey = name.toLowerCase();
+        if (name && name !== "Schedule" && !seenNames.has(nameKey) && !clubLinks.find(c => c.gsId === cm![2])) {
+          seenNames.add(nameKey);
           clubLinks.push({ url: `${BASE}${cm[1]}`, gsId: cm[2], name });
         }
       }
@@ -179,9 +182,12 @@ export function registerClubRoutes(app: Express) {
       const { data: existingClubs } = await supabase.from("clubs").select("id, name").limit(1000);
       const existingNames = new Set((existingClubs || []).map((c: any) => c.name.toLowerCase().trim()));
 
-      // Take next batch of clubs not yet in DB by name
+      // Take next batch of clubs not yet in DB by name (deduplicated)
       const toProcess = clubLinks.filter(c => !existingNames.has(c.name.toLowerCase().trim())).slice(0, batch);
       if (!toProcess.length) return res.json({ ok: true, message: `All ${clubLinks.length} GotSport clubs already exist in DB`, total: clubLinks.length });
+
+      // Track names created during this batch to avoid within-batch duplicates
+      const createdThisBatch = new Set<string>();
 
       const storeLogo = async (id: string, imgUrl: string): Promise<string | null> => {
         try {
@@ -204,6 +210,10 @@ export function registerClubRoutes(app: Express) {
       const log: string[] = [];
 
       for (const clubEntry of toProcess) {
+        const nameKey = clubEntry.name.toLowerCase().trim();
+        if (createdThisBatch.has(nameKey)) continue;
+        createdThisBatch.add(nameKey);
+
         // ── Step 2: get team list for this club ──────────────
         const clubHtml = await fetchHtml(clubEntry.url);
         if (!clubHtml) { log.push(`SKIP ${clubEntry.name}: could not fetch`); continue; }
