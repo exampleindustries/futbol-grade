@@ -138,89 +138,152 @@ export function registerClubRoutes(app: Express) {
     }
   });
 
-  // Admin: crawl logos for top 10 pending clubs and set as coach photo default
+  // Admin: crawl logos for top 10 pending clubs via DuckDuckGo image search
   app.post("/api/admin/clubs/crawl-logos", async (req, res) => {
     try {
       const supabase = await requireAdmin(req, res);
       if (!supabase) return;
 
+      // Fetch all pending clubs — no website requirement
       const { data: clubs } = await supabase
         .from("clubs")
-        .select("id, name, website, logo_url")
+        .select("id, name, city, state, website, logo_url")
         .eq("status", "pending")
-        .not("website", "is", null)
         .order("name")
         .limit(10);
 
-      if (!clubs || clubs.length === 0) return res.json({ ok: true, crawled: 0, logos: 0, coaches: 0 });
+      if (!clubs || clubs.length === 0)
+        return res.json({ ok: true, crawled: 0, logos: 0, coaches: 0, message: "No pending clubs found" });
+
+      const UA = "Mozilla/5.0 (compatible; FutbolGrade-LogoCrawler/1.0)";
+
+      async function downloadAndStore(clubId: string, imgUrl: string): Promise<string | null> {
+        try {
+          const imgResp = await fetch(imgUrl, {
+            signal: AbortSignal.timeout(10000),
+            headers: { "User-Agent": UA },
+          });
+          if (!imgResp.ok) return null;
+          const ct = imgResp.headers.get("content-type") || "";
+          if (!ct.startsWith("image/")) return null;
+          const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
+          if (imgBuffer.length < 500) return null; // skip tiny/broken images
+          const ext = imgUrl.match(/\.(png|jpg|jpeg|webp|svg)/i)?.[1] ||
+            (ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : ct.includes("svg") ? "svg" : "jpeg");
+          const storagePath = `${clubId}.${ext}`;
+          const { error } = await supabase.storage.from("club-logos").upload(storagePath, imgBuffer, {
+            upsert: true,
+            contentType: ct.split(";")[0],
+          });
+          if (error) return null;
+          const { data: urlData } = supabase.storage.from("club-logos").getPublicUrl(storagePath);
+          return urlData.publicUrl + "?v=" + Date.now();
+        } catch {
+          return null;
+        }
+      }
+
+      async function scrapeLogoFromSite(siteUrl: string): Promise<string | null> {
+        try {
+          const base = siteUrl.replace(/\/$/, "");
+          const resp = await fetch(base, {
+            signal: AbortSignal.timeout(10000),
+            headers: { "User-Agent": UA },
+            redirect: "follow",
+          });
+          if (!resp.ok) return null;
+          const ct = resp.headers.get("content-type") || "";
+          if (!ct.includes("text/html")) return null;
+          const html = await resp.text();
+
+          // og:image
+          const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+            || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+          if (og?.[1]) return og[1].startsWith("http") ? og[1] : new URL(og[1], base).href;
+
+          // apple-touch-icon
+          const icon = html.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i)
+            || html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']apple-touch-icon["']/i);
+          if (icon?.[1]) return icon[1].startsWith("http") ? icon[1] : new URL(icon[1], base).href;
+
+          // img with logo in class/alt/id
+          const logoImg = html.match(/<img[^>]+src=["']([^"']+)["'][^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["']/i)
+            || html.match(/<img[^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i);
+          if (logoImg?.[1]) return logoImg[1].startsWith("http") ? logoImg[1] : new URL(logoImg[1], base).href;
+
+          return null;
+        } catch {
+          return null;
+        }
+      }
+
+      async function searchDuckDuckGoForLogo(club: any): Promise<string | null> {
+        const location = [club.city, club.state].filter(Boolean).join(" ");
+        const query = encodeURIComponent(`${club.name} soccer ${location} logo`);
+        try {
+          // DuckDuckGo HTML search — grab first image result URLs from results
+          const searchResp = await fetch(`https://html.duckduckgo.com/html/?q=${query}&iax=images&ia=images`, {
+            signal: AbortSignal.timeout(12000),
+            headers: {
+              "User-Agent": UA,
+              "Accept": "text/html",
+            },
+          });
+          if (!searchResp.ok) return null;
+          const html = await searchResp.text();
+
+          // Extract site links from search results to find the club's website
+          const siteLinks: string[] = [];
+          const linkPattern = /href="(https?:\/\/(?!duckduckgo|google|facebook|twitter|instagram|youtube|yelp)[^"]+)"/gi;
+          let m;
+          while ((m = linkPattern.exec(html)) !== null && siteLinks.length < 5) {
+            const url = m[1];
+            if (!siteLinks.includes(url)) siteLinks.push(url);
+          }
+
+          // Try scraping each candidate site for a logo
+          for (const siteUrl of siteLinks) {
+            const logoUrl = await scrapeLogoFromSite(siteUrl);
+            if (logoUrl) {
+              console.log(`[LOGO-CRAWL] ${club.name}: found logo via DDG at ${siteUrl}`);
+              return logoUrl;
+            }
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      }
 
       let logos = 0;
       let coachesUpdated = 0;
 
       for (const club of clubs) {
-        if (!club.website) continue;
-        const base = club.website.replace(/\/$/, "");
         let logoUrl: string | null = club.logo_url || null;
 
         if (!logoUrl) {
-          try {
-            const resp = await fetch(base, {
-              signal: AbortSignal.timeout(8000),
-              headers: { "User-Agent": "FutbolGrade-LogoCrawler/1.0" },
-              redirect: "follow",
-            });
-            if (resp.ok) {
-              const html = await resp.text();
-
-              const ogMatch =
-                html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-                html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-              if (ogMatch) logoUrl = ogMatch[1];
-
-              if (!logoUrl) {
-                const iconMatch =
-                  html.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i) ||
-                  html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']apple-touch-icon["']/i);
-                if (iconMatch) logoUrl = iconMatch[1];
-              }
-
-              if (!logoUrl) {
-                const logoImgMatch =
-                  html.match(/<img[^>]+src=["']([^"']+)["'][^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["']/i) ||
-                  html.match(/<img[^>]*(?:class|alt|id)=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i);
-                if (logoImgMatch) logoUrl = logoImgMatch[1];
-              }
-
-              if (logoUrl && !logoUrl.startsWith("http")) {
-                logoUrl = new URL(logoUrl, base).href;
-              }
-
-              if (logoUrl) {
-                try {
-                  const imgResp = await fetch(logoUrl, { signal: AbortSignal.timeout(8000) });
-                  if (imgResp.ok) {
-                    const imgBuffer = Buffer.from(await imgResp.arrayBuffer());
-                    const ext = logoUrl.match(/\.(png|jpg|jpeg|webp|svg)/i)?.[1] || "png";
-                    const storagePath = `${club.id}.${ext}`;
-                    await supabase.storage.from("club-logos").upload(storagePath, imgBuffer, {
-                      upsert: true,
-                      contentType: `image/${ext === "jpg" ? "jpeg" : ext}`,
-                    });
-                    const { data: urlData } = supabase.storage.from("club-logos").getPublicUrl(storagePath);
-                    logoUrl = urlData.publicUrl + "?v=" + Date.now();
-                    await supabase.from("clubs").update({ logo_url: logoUrl }).eq("id", club.id);
-                    logos++;
-                    console.log(`[LOGO-CRAWL] Found logo for ${club.name}: ${logoUrl}`);
-                  } else {
-                    logoUrl = null;
-                  }
-                } catch {
-                  logoUrl = null;
-                }
-              }
+          // 1. Try the club's own website first if we have it
+          if (club.website) {
+            const fromSite = await scrapeLogoFromSite(club.website);
+            if (fromSite) {
+              logoUrl = await downloadAndStore(club.id, fromSite);
             }
-          } catch {
-            /* skip */
+          }
+
+          // 2. Fall back to DuckDuckGo search
+          if (!logoUrl) {
+            const fromSearch = await searchDuckDuckGoForLogo(club);
+            if (fromSearch) {
+              logoUrl = await downloadAndStore(club.id, fromSearch);
+            }
+          }
+
+          if (logoUrl) {
+            await supabase.from("clubs").update({ logo_url: logoUrl }).eq("id", club.id);
+            logos++;
+            console.log(`[LOGO-CRAWL] Saved logo for ${club.name}`);
+          } else {
+            console.log(`[LOGO-CRAWL] No logo found for ${club.name}`);
           }
         }
 
@@ -228,7 +291,7 @@ export function registerClubRoutes(app: Express) {
         if (logoUrl) {
           const { data: coaches } = await supabase
             .from("coaches")
-            .select("id, photo_url")
+            .select("id")
             .eq("club_id", club.id)
             .is("photo_url", null);
           if (coaches && coaches.length > 0) {
