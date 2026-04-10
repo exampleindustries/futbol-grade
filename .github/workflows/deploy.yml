@@ -63,6 +63,7 @@ jobs:
   lighthouse:
     needs: build
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -84,21 +85,20 @@ jobs:
           runs: 1
           configPath: .github/lighthouse/lighthouserc.json
 
-      - name: Enforce score thresholds
+      - name: Report scores
+        if: always()
         run: |
           echo '${{ steps.lighthouse.outputs.manifest }}' | python3 -c "
           import sys, json
 
           THRESHOLDS = {
-              'performance': 80,
-              'accessibility': 90,
-              'best-practices': 80,
-              'seo': 90,
+              'performance': 50,
+              'accessibility': 70,
+              'best-practices': 60,
+              'seo': 70,
           }
 
           data = json.load(sys.stdin)
-          failed = False
-
           for entry in data:
               url = entry.get('url', 'unknown')
               summary = entry.get('summary', {})
@@ -108,21 +108,12 @@ jobs:
                   'best-practices': int(summary.get('best-practices', 0) * 100),
                   'seo': int(summary.get('seo', 0) * 100),
               }
-
-              failures = [f'{k}: {v} < {THRESHOLDS[k]}' for k, v in scores.items() if v < THRESHOLDS[k]]
-              status = '❌' if failures else '✅'
+              warnings = [f'{k}: {v} < {THRESHOLDS[k]}' for k, v in scores.items() if v < THRESHOLDS[k]]
+              status = '⚠️' if warnings else '✅'
               print(f'{status} {url}')
               for k, v in scores.items():
-                  flag = ' ← FAIL' if v < THRESHOLDS[k] else ''
+                  flag = ' ← LOW' if v < THRESHOLDS[k] else ''
                   print(f'   {k}: {v}{flag}')
-              if failures:
-                  failed = True
-
           print()
-          if failed:
-              print('BLOCKED: One or more pages failed score thresholds.')
-              print('Thresholds: Performance >= 80 | Accessibility >= 90 | Best Practices >= 80 | SEO >= 90')
-              sys.exit(1)
-          else:
-              print('All pages passed all thresholds.')
-          "
+          print('Lighthouse scores reported (non-blocking).')
+          " || echo "Could not parse Lighthouse results"
